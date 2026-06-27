@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Login — Painel Moreira Higienizações</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..900&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --azul-marinho: #0B2545;
+    --azul-marinho-escuro: #071A33;
+    --creme: #F4F1E8;
+    --creme-claro: #FAF8F2;
+    --azul-vapor: #3D7BC4;
+    --dourado: #C99A4A;
+    --dourado-claro: #E0C285;
+    --vermelho-erro: #C8553D;
+    --font-display: 'Fraunces', serif;
+    --font-body: 'Work Sans', sans-serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: var(--font-body);
+    background: var(--azul-marinho-escuro);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  .login-card {
+    background: var(--creme-claro);
+    border-radius: 24px;
+    padding: 44px;
+    max-width: 400px;
+    width: 100%;
+    box-shadow: 0 30px 80px rgba(0,0,0,0.35);
+  }
+  .login-brand { text-align: center; margin-bottom: 28px; }
+  .login-brand img { width: 76px; height: 76px; border-radius: 50%; margin-bottom: 14px; }
+  .login-brand h1 {
+    font-family: var(--font-display);
+    color: var(--azul-marinho);
+    font-size: 1.4rem;
+    font-weight: 700;
+  }
+  .login-brand p { color: #6b7a93; font-size: 0.85rem; margin-top: 4px; }
+  .field { margin-bottom: 18px; }
+  .field label { display: block; font-size: 0.85rem; font-weight: 600; color: var(--azul-marinho); margin-bottom: 8px; }
+  .field input {
+    width: 100%;
+    padding: 13px 14px;
+    border-radius: 10px;
+    border: 1.5px solid #DDE3ED;
+    font-size: 0.95rem;
+    background: var(--creme);
+  }
+  .field input:focus { outline: none; border-color: var(--azul-vapor); }
+  .btn-login {
+    width: 100%;
+    background: var(--azul-marinho);
+    color: var(--creme);
+    padding: 14px;
+    border-radius: 10px;
+    border: none;
+    font-weight: 700;
+    font-size: 0.95rem;
+    margin-top: 8px;
+    transition: background 0.2s ease;
+  }
+  .btn-login:hover { background: var(--azul-vapor); }
+  .btn-login:disabled { opacity: 0.6; cursor: not-allowed; }
+  .erro-msg {
+    background: rgba(200,85,61,0.1);
+    color: var(--vermelho-erro);
+    padding: 12px 14px;
+    border-radius: 10px;
+    font-size: 0.85rem;
+    margin-bottom: 18px;
+    display: none;
+  }
+  .erro-msg.show { display: block; }
+</style>
+</head>
+<body>
+
+<div class="login-card">
+  <div class="login-brand">
+    <img src="../assets/selo-marca.jpg" alt="Moreira Higienizações">
+    <h1>Painel Admin</h1>
+    <p>Moreira Higienizações</p>
+  </div>
+
+  <div class="erro-msg" id="erroMsg"></div>
+
+  <form id="formLogin">
+    <div class="field">
+      <label for="usuario">Usuário</label>
+      <input type="text" id="usuario" required autocomplete="username" placeholder="seu usuário">
+    </div>
+    <div class="field">
+      <label for="senha">Senha</label>
+      <input type="password" id="senha" required autocomplete="current-password" placeholder="••••••••">
+    </div>
+    <button type="submit" class="btn-login" id="btnLogin">Entrar</button>
+  </form>
+</div>
+
+<script src="../supabase-loader.js"></script>
+<script src="../config.js"></script>
+<script>
+  const formLogin = document.getElementById("formLogin");
+  const erroMsg = document.getElementById("erroMsg");
+  const btnLogin = document.getElementById("btnLogin");
+
+  // Se já está logado, vai direto pro dashboard
+  if (sessionStorage.getItem("moreira_admin_usuario")) {
+    window.location.href = "dashboard.html";
+  }
+
+  formLogin.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    erroMsg.classList.remove("show");
+    btnLogin.disabled = true;
+    btnLogin.textContent = "Entrando...";
+
+    const usuario = document.getElementById("usuario").value.trim();
+    const senha = document.getElementById("senha").value;
+
+    try {
+      const resposta = await fetch("/api/login.js", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ usuario, senha })
+      });
+
+      const resultado = await resposta.json();
+
+      if (!resposta.ok || !resultado.sucesso) {
+        throw new Error(resultado.mensagem || "Usuário ou senha incorretos.");
+      }
+
+      sessionStorage.setItem("moreira_admin_usuario", JSON.stringify(resultado.usuario));
+      window.location.href = "dashboard.html";
+    } catch (err) {
+      erroMsg.textContent = err.message || "Não foi possível entrar. Tente novamente.";
+      erroMsg.classList.add("show");
+      btnLogin.disabled = false;
+      btnLogin.textContent = "Entrar";
+    }
+  });
+</script>
+</body>
+</html>
