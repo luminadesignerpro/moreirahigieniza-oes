@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard — Painel Moreira Higienizações</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..900&family=Work+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="admin-styles.css">
+</head>
+<body>
+
+<main class="main">
+  <div class="topbar">
+    <div>
+      <h2 id="saudacao">Olá, Administrador</h2>
+      <p class="subtitle">Aqui está o resumo do seu negócio hoje.</p>
+    </div>
+    <div class="user-chip">
+      <div class="user-avatar" id="userAvatar">M</div>
+      <div>
+        <div class="user-name" id="userName">—</div>
+        <div class="user-role">Administrador</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="metrics-grid">
+    <div class="metric-card accent">
+      <div class="metric-label">💰 Receita do mês</div>
+      <div class="metric-value" id="metricReceita">R$ 0</div>
+      <div class="metric-delta" id="metricReceitaSub">—</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">🗓️ Agendamentos hoje</div>
+      <div class="metric-value" id="metricHoje">0</div>
+      <div class="metric-delta">—</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">⏳ Pagamentos pendentes</div>
+      <div class="metric-value" id="metricPendentes">R$ 0</div>
+      <div class="metric-delta" id="metricPendentesSub">—</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">👥 Clientes cadastrados</div>
+      <div class="metric-value" id="metricClientes">0</div>
+      <div class="metric-delta">—</div>
+    </div>
+  </div>
+
+  <div style="display:grid; grid-template-columns: 1.4fr 1fr; gap: 22px;" id="dashboardGridLayout">
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h3>Próximos agendamentos</h3>
+          <p>Visitas marcadas e ainda não realizadas</p>
+        </div>
+        <a href="agendamentos.html" class="btn btn-outline btn-sm">Ver todos</a>
+      </div>
+      <div id="listaProximosAgendamentos">
+        <div class="empty-state">
+          <div class="empty-icon">🗓️</div>
+          <p>Carregando agendamentos...</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h3>Serviços mais pedidos</h3>
+          <p>Este mês</p>
+        </div>
+      </div>
+      <div id="rankingServicos">
+        <div class="empty-state">
+          <div class="empty-icon">📊</div>
+          <p>Carregando dados...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script src="../supabase-loader.js"></script>
+<script src="../config.js"></script>
+<script src="admin-data.js"></script>
+<script src="admin-sidebar.js"></script>
+<script>
+  protegerPagina();
+  montarSidebar("dashboard");
+
+  const sessao = JSON.parse(sessionStorage.getItem("moreira_admin_usuario") || "{}");
+  if (sessao.nome) {
+    document.getElementById("saudacao").textContent = `Olá, ${sessao.nome}`;
+    document.getElementById("userName").textContent = sessao.nome;
+    document.getElementById("userAvatar").textContent = sessao.nome.charAt(0).toUpperCase();
+  }
+
+  const ICONES_SERVICO = { sofa: "🛋️", colchao: "🛏️", poltrona: "🪑", tapete: "🧶" };
+  const NOMES_SERVICO = { sofa: "Sofá", colchao: "Colchão", poltrona: "Poltrona", tapete: "Tapete" };
+
+  async function carregarDashboard() {
+    try {
+      const [resumo, agendamentos, clientes, ranking] = await Promise.all([
+        calcularResumoFinanceiro(),
+        listarAgendamentos({ limite: 8 }),
+        listarClientes(),
+        listarServicoMaisPedido()
+      ]);
+
+      document.getElementById("metricReceita").textContent = formatarMoeda(resumo.receitaTotal);
+      document.getElementById("metricReceitaSub").textContent = `Lucro líquido: ${formatarMoeda(resumo.lucroLiquido)}`;
+      document.getElementById("metricReceitaSub").classList.add(resumo.lucroLiquido >= 0 ? "up" : "down");
+
+      document.getElementById("metricPendentes").textContent = formatarMoeda(resumo.valorPendente);
+      document.getElementById("metricPendentesSub").textContent = `${resumo.pendentes} serviço(s) a receber`;
+
+      document.getElementById("metricClientes").textContent = clientes.length;
+
+      const hojeStr = new Date().toISOString().slice(0, 10);
+      const hojeCount = agendamentos.filter((a) => (a.data_servico || "").slice(0, 10) === hojeStr).length;
+      document.getElementById("metricHoje").textContent = hojeCount;
+
+      renderizarProximosAgendamentos(agendamentos);
+      renderizarRankingServicos(ranking);
+    } catch (err) {
+      console.error(err);
+      mostrarToast("Não foi possível carregar os dados. Verifique a conexão com o Supabase.", "error");
+    }
+  }
+
+  function renderizarProximosAgendamentos(lista) {
+    const container = document.getElementById("listaProximosAgendamentos");
+    const proximos = lista
+      .filter((a) => a.status === STATUS_AGENDAMENTO.AGENDADO)
+      .slice(0, 5);
+
+    if (proximos.length === 0) {
+      container.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-icon">🗓️</div>
+          <p>Nenhum agendamento pendente. Novos pedidos do bot aparecem aqui.</p>
+        </div>`;
+      return;
+    }
+
+    container.innerHTML = `
+      <table>
+        <thead>
+          <tr><th>Cliente</th><th>Serviço</th><th>Data</th><th>Status</th></tr>
+        </thead>
+        <tbody>
+          ${proximos.map((a) => `
+            <tr>
+              <td><strong>${a.clientes?.nome || "Cliente"}</strong></td>
+              <td>${ICONES_SERVICO[a.tipo_servico] || ""} ${NOMES_SERVICO[a.tipo_servico] || a.tipo_servico}</td>
+              <td>${formatarData(a.data_servico)}</td>
+              <td><span class="badge badge-${a.status}">${a.status}</span></td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>`;
+  }
+
+  function renderizarRankingServicos(contagem) {
+    const container = document.getElementById("rankingServicos");
+    const entradas = Object.entries(contagem).sort((a, b) => b[1] - a[1]);
+
+    if (entradas.length === 0) {
+      container.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-icon">📊</div>
+          <p>Ainda não há serviços registrados.</p>
+        </div>`;
+      return;
+    }
+
+    const max = entradas[0][1];
+    container.innerHTML = entradas.map(([tipo, qtd]) => `
+      <div style="margin-bottom: 16px;">
+        <div style="display:flex; justify-content:space-between; font-size:0.88rem; margin-bottom:6px;">
+          <span>${ICONES_SERVICO[tipo] || ""} ${NOMES_SERVICO[tipo] || tipo}</span>
+          <strong>${qtd}</strong>
+        </div>
+        <div style="background:#ECEAE0; border-radius:100px; height:8px; overflow:hidden;">
+          <div style="background:var(--dourado); height:100%; width:${(qtd / max) * 100}%;"></div>
+        </div>
+      </div>
+    `).join("");
+  }
+
+  carregarDashboard();
+</script>
+</body>
+</html>

@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WhatsApp Bot — Painel Moreira Higienizações</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..900&family=Work+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="admin-styles.css">
+<style>
+  .bot-layout { display: grid; grid-template-columns: 220px 1fr 340px; gap: 22px; align-items: start; }
+  .bot-subnav { display: flex; flex-direction: column; gap: 6px; }
+  .bot-subnav .nav-item { color: var(--azul-marinho); }
+  .bot-subnav .nav-item.active { background: var(--azul-marinho); color: var(--creme); }
+  .bot-subnav .nav-item:hover:not(.active) { background: var(--creme-claro); }
+
+  .qr-box {
+    border: 2px dashed #DDE3ED;
+    border-radius: 18px;
+    padding: 40px;
+    text-align: center;
+    background: var(--creme-claro);
+  }
+  .qr-box img, .qr-box .qr-placeholder {
+    width: 220px; height: 220px;
+    margin: 0 auto 20px;
+    background: var(--branco);
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 3rem;
+  }
+
+  .fluxo-card { margin-bottom: 18px; }
+  .fluxo-card textarea {
+    width: 100%;
+    min-height: 130px;
+    border-radius: 10px;
+    border: 1.5px solid #DDE3ED;
+    padding: 14px;
+    font-size: 0.88rem;
+    background: var(--creme-claro);
+    resize: vertical;
+    line-height: 1.5;
+  }
+  .fluxo-card textarea:focus { outline: none; border-color: var(--azul-vapor); }
+  .fluxo-card h4 { font-size: 0.95rem; color: var(--azul-marinho); margin-bottom: 4px; font-family: var(--font-display); }
+  .fluxo-card .fluxo-desc { font-size: 0.8rem; color: #8b97ab; margin-bottom: 10px; }
+
+  /* TELEFONE SIMULADO */
+  .phone-mock {
+    background: var(--azul-marinho-escuro);
+    border-radius: 28px;
+    padding: 10px;
+    box-shadow: 0 20px 50px rgba(11,37,69,0.3);
+  }
+  .phone-screen {
+    background: #ECE5DD;
+    border-radius: 20px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    height: 560px;
+  }
+  .phone-header {
+    background: var(--azul-marinho);
+    color: var(--creme);
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .phone-header .avatar {
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    background: var(--dourado);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700;
+    color: var(--azul-marinho-escuro);
+    font-size: 0.85rem;
+  }
+  .phone-header .info b { font-size: 0.88rem; display: block; }
+  .phone-header .info span { font-size: 0.7rem; opacity: 0.8; }
+  .phone-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .msg {
+    max-width: 80%;
+    padding: 9px 12px;
+    border-radius: 10px;
+    font-size: 0.84rem;
+    line-height: 1.4;
+    white-space: pre-wrap;
+  }
+  .msg.bot { background: var(--branco); align-self: flex-start; border-top-left-radius: 2px; }
+  .msg.user { background: #DCF8C6; align-self: flex-end; border-top-right-radius: 2px; }
+  .phone-input {
+    display: flex;
+    gap: 8px;
+    padding: 10px;
+    background: #F0F0F0;
+  }
+  .phone-input input {
+    flex: 1;
+    border: none;
+    border-radius: 100px;
+    padding: 10px 16px;
+    font-size: 0.85rem;
+  }
+  .phone-input input:focus { outline: none; }
+  .phone-input button {
+    width: 38px; height: 38px;
+    border-radius: 50%;
+    background: var(--azul-marinho);
+    color: var(--creme);
+    border: none;
+    font-size: 1rem;
+  }
+
+  @media (max-width: 1180px) {
+    .bot-layout { grid-template-columns: 1fr; }
+    .bot-subnav { flex-direction: row; overflow-x: auto; }
+    .phone-mock { max-width: 320px; margin: 0 auto; }
+  }
+</style>
+</head>
+<body>
+
+<main class="main">
+  <div class="topbar">
+    <div>
+      <h2>WhatsApp Bot</h2>
+      <p class="subtitle">Atendimento automático — conecte, edite as mensagens e teste antes de publicar.</p>
+    </div>
+  </div>
+
+  <div class="bot-layout">
+    <!-- SUBNAV -->
+    <div class="bot-subnav">
+      <button class="nav-item active" data-secao="conexao">
+        <span class="icon">📶</span><span>Conexão</span>
+      </button>
+      <button class="nav-item" data-secao="fluxo">
+        <span class="icon">✨</span><span>Fluxo do Bot</span>
+      </button>
+      <button class="nav-item" data-secao="testar">
+        <span class="icon">📱</span><span>Testar no Chat</span>
+      </button>
+    </div>
+
+    <!-- CONTEÚDO CENTRAL -->
+    <div>
+      <!-- SEÇÃO CONEXÃO -->
+      <div class="card secao-bot" id="secaoConexao">
+        <div class="card-header">
+          <div><h3>Conectar aparelho</h3><p>Escaneie com o WhatsApp do número (85) 98900-2147</p></div>
+        </div>
+        <div class="qr-box">
+          <div class="qr-placeholder">📷</div>
+          <p style="color:#6b7a93; font-size:0.88rem; margin-bottom:18px;">Escaneie este QR Code com a câmera do seu WhatsApp (Aparelhos Conectados)</p>
+          <button class="btn btn-outline" id="btnRecarregarQR">Recarregar QR Code</button>
+        </div>
+
+        <div class="card-header" style="margin-top:28px;">
+          <div><h3>Evolution API</h3><p>Configure os dados da sua API hospedada</p></div>
+        </div>
+        <div class="field">
+          <label>URL da API (endpoint)</label>
+          <input type="text" id="campoApiUrl" placeholder="https://sua-evolution-api.com">
+        </div>
+        <div class="field">
+          <label>Token de acesso (API Key)</label>
+          <input type="password" id="campoApiKey" placeholder="••••••••">
+        </div>
+        <div class="field">
+          <label>Nome da instância</label>
+          <input type="text" id="campoInstancia" placeholder="Ex: moreira-higienizacoes">
+        </div>
+        <button class="btn btn-primary" id="btnSalvarConexao">Salvar &amp; Conectar</button>
+      </div>
+
+      <!-- SEÇÃO FLUXO -->
+      <div class="card secao-bot" id="secaoFluxo" style="display:none;">
+        <div class="card-header">
+          <div><h3>Fluxo de atendimento</h3><p>Customize as mensagens automáticas do seu bot</p></div>
+          <button class="btn btn-primary" id="btnSalvarFluxo">Salvar alterações</button>
+        </div>
+
+        <div class="fluxo-card">
+          <h4>Menu principal (boas-vindas)</h4>
+          <p class="fluxo-desc">Enviado assim que o cliente manda a primeira mensagem.</p>
+          <textarea id="fluxoBoasVindas"></textarea>
+        </div>
+
+        <div class="fluxo-card">
+          <h4>Opção 1 — Pedir orçamento</h4>
+          <p class="fluxo-desc">Pergunta o tipo de estofado e gera uma estimativa de preço.</p>
+          <textarea id="fluxoOrcamento"></textarea>
+        </div>
+
+        <div class="fluxo-card">
+          <h4>Opção 2 — Agendar visita</h4>
+          <p class="fluxo-desc">Mensagem explicando como marcar o dia e horário.</p>
+          <textarea id="fluxoAgendamento"></textarea>
+        </div>
+
+        <div class="fluxo-card">
+          <h4>Opção 3 — Tabela de serviços</h4>
+          <p class="fluxo-desc">Lista de serviços e preços de referência.</p>
+          <textarea id="fluxoServicos"></textarea>
+        </div>
+
+        <div class="fluxo-card">
+          <h4>Opção 4 — Falar com atendente</h4>
+          <p class="fluxo-desc">Encerra o bot e avisa que o Moreira vai responder pessoalmente.</p>
+          <textarea id="fluxoAtendente" style="min-height:80px;"></textarea>
+        </div>
+      </div>
+
+      <!-- SEÇÃO TESTAR (mobile: mostra o telefone aqui tbm) -->
+      <div class="card secao-bot" id="secaoTestar" style="display:none;">
+        <div class="card-header">
+          <div><h3>Simulador do robô</h3><p>Use o telefone ao lado para testar a experiência exata de um cliente.</p></div>
+        </div>
+        <p style="font-size:0.88rem; color:#6b7a93; margin-bottom:14px;"><strong>Como testar:</strong></p>
+        <ol style="font-size:0.86rem; color:#6b7a93; line-height:1.8; padding-left:20px;">
+          <li>Envie "Oi" ou "Menu" para começar.</li>
+          <li>Digite o número da opção desejada (1 a 4).</li>
+          <li>Para orçamento, informe o tipo de estofado (ex: "sofá 3 lugares").</li>
+          <li>Veja a conversa em tempo real no telefone ao lado →</li>
+        </ol>
+        <button class="btn btn-outline" id="btnReiniciarConversa" style="margin-top:18px;">Reiniciar conversa</button>
+      </div>
+    </div>
+
+    <!-- TELEFONE SIMULADO (sempre visível) -->
+    <div class="phone-mock">
+      <div class="phone-screen">
+        <div class="phone-header">
+          <div class="avatar">M</div>
+          <div class="info">
+            <b>Bella (Moreira Bot)</b>
+            <span>Online · Assistente Virtual</span>
+          </div>
+        </div>
+        <div class="phone-messages" id="phoneMessages"></div>
+        <div class="phone-input">
+          <input type="text" id="phoneInputText" placeholder="Digite uma mensagem...">
+          <button id="phoneSendBtn">➤</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script src="../supabase-loader.js"></script>
+<script src="../config.js"></script>
+<script src="admin-data.js"></script>
+<script src="admin-sidebar.js"></script>
+<script>
+  protegerPagina();
+  montarSidebar("bot");
+
+  // ----- NAVEGAÇÃO ENTRE SUBSEÇÕES -----
+  document.querySelectorAll(".bot-subnav .nav-item").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".bot-subnav .nav-item").forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      document.querySelectorAll(".secao-bot").forEach((s) => s.style.display = "none");
+      document.getElementById("secao" + btn.dataset.secao.charAt(0).toUpperCase() + btn.dataset.secao.slice(1)).style.display = "block";
+    });
+  });
+
+  // ----- TEXTOS PADRÃO DO FLUXO (editáveis e salvos no localStorage por simplicidade aqui;
+  //       trocar por tabela "fluxo_bot" no Supabase quando a Evolution API estiver configurada) -----
+  const FLUXO_PADRAO = {
+    boasVindas: `Olá! Seja bem-vindo(a) à Moreira Higienizações! 🛋️✨
+
+Eu sou a Bella, assistente virtual. Como posso te ajudar hoje?
+
+Digite o número da opção desejada:
+*1* - 💰 Pedir orçamento
+*2* - 🗓️ Agendar visita
+*3* - 📋 Ver serviços e preços
+*4* - 🙋 Falar com atendente`,
+    orcamento: `Ótimo! Vamos calcular seu orçamento. 💰
+
+Me conta:
+1. O que você quer higienizar? (sofá, colchão, poltrona ou tapete)
+2. Se for sofá, quantos lugares tem?
+
+Em poucos minutos te mando o valor estimado!`,
+    agendamento: `Perfeito! Vamos agendar sua visita. 🗓️
+
+Preciso de algumas informações:
+1. Seu nome completo
+2. Endereço (bairro) em Fortaleza
+3. Dia e horário de preferência
+
+Confirmamos o agendamento por aqui mesmo!`,
+    servicos: `📋 *Nossos serviços e valores:*
+
+🛋️ Sofá: a partir de R$ 60 por lugar
+🛏️ Colchão: a partir de R$ 90
+🪑 Poltrona: a partir de R$ 70
+🧶 Tapete: sob consulta
+
+💳 Aceitamos Pix, dinheiro e cartão.`,
+    atendente: `Tudo bem! Já vou te transferir para o Moreira. 🙋
+
+Em breve ele te responde por aqui mesmo!`
+  };
+
+  function carregarFluxoSalvo() {
+    const salvo = JSON.parse(localStorage.getItem("moreira_fluxo_bot") || "null") || FLUXO_PADRAO;
+    document.getElementById("fluxoBoasVindas").value = salvo.boasVindas;
+    document.getElementById("fluxoOrcamento").value = salvo.orcamento;
+    document.getElementById("fluxoAgendamento").value = salvo.agendamento;
+    document.getElementById("fluxoServicos").value = salvo.servicos;
+    document.getElementById("fluxoAtendente").value = salvo.atendente;
+    return salvo;
+  }
+
+  let fluxoAtual = carregarFluxoSalvo();
+
+  document.getElementById("btnSalvarFluxo").addEventListener("click", () => {
+    fluxoAtual = {
+      boasVindas: document.getElementById("fluxoBoasVindas").value,
+      orcamento: document.getElementById("fluxoOrcamento").value,
+      agendamento: document.getElementById("fluxoAgendamento").value,
+      servicos: document.getElementById("fluxoServicos").value,
+      atendente: document.getElementById("fluxoAtendente").value
+    };
+    localStorage.setItem("moreira_fluxo_bot", JSON.stringify(fluxoAtual));
+    mostrarToast("Fluxo do bot salvo!", "success");
+  });
+
+  // ----- SIMULADOR DE CHAT -----
+  const phoneMessages = document.getElementById("phoneMessages");
+  const phoneInput = document.getElementById("phoneInputText");
+
+  function adicionarMensagem(texto, autor) {
+    const div = document.createElement("div");
+    div.className = `msg ${autor}`;
+    div.textContent = texto;
+    phoneMessages.appendChild(div);
+    phoneMessages.scrollTop = phoneMessages.scrollHeight;
+  }
+
+  function iniciarConversa() {
+    phoneMessages.innerHTML = "";
+    setTimeout(() => adicionarMensagem(fluxoAtual.boasVindas, "bot"), 200);
+  }
+
+  function processarResposta(msgUsuario) {
+    const texto = msgUsuario.trim().toLowerCase();
+    let resposta = null;
+
+    if (texto === "1") resposta = fluxoAtual.orcamento;
+    else if (texto === "2") resposta = fluxoAtual.agendamento;
+    else if (texto === "3") resposta = fluxoAtual.servicos;
+    else if (texto === "4") resposta = fluxoAtual.atendente;
+    else if (["oi", "olá", "ola", "menu"].includes(texto)) resposta = fluxoAtual.boasVindas;
+    else resposta = `Não entendi 🤔\n\nDigite *menu* para ver as opções novamente.`;
+
+    setTimeout(() => adicionarMensagem(resposta, "bot"), 500);
+  }
+
+  document.getElementById("phoneSendBtn").addEventListener("click", enviarMensagemTeste);
+  phoneInput.addEventListener("keypress", (e) => { if (e.key === "Enter") enviarMensagemTeste(); });
+
+  function enviarMensagemTeste() {
+    const valor = phoneInput.value.trim();
+    if (!valor) return;
+    adicionarMensagem(valor, "user");
+    phoneInput.value = "";
+    processarResposta(valor);
+  }
+
+  document.getElementById("btnReiniciarConversa").addEventListener("click", iniciarConversa);
+
+  // ----- CONEXÃO (placeholders salvos localmente; ligar à Evolution API real depois) -----
+  document.getElementById("btnSalvarConexao").addEventListener("click", () => {
+    const url = document.getElementById("campoApiUrl").value.trim();
+    const key = document.getElementById("campoApiKey").value.trim();
+    const instancia = document.getElementById("campoInstancia").value.trim();
+    if (!url || !key || !instancia) {
+      mostrarToast("Preencha URL, token e nome da instância.", "error");
+      return;
+    }
+    localStorage.setItem("moreira_evolution_config", JSON.stringify({ url, key, instancia }));
+    mostrarToast("Configuração salva. Escaneie o QR Code para conectar.", "success");
+  });
+
+  document.getElementById("btnRecarregarQR").addEventListener("click", () => {
+    mostrarToast("Gerando novo QR Code...");
+  });
+
+  iniciarConversa();
+</script>
+</body>
+</html>

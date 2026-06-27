@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agendamentos — Painel Moreira Higienizações</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..900&family=Work+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="admin-styles.css">
+</head>
+<body>
+
+<main class="main">
+  <div class="topbar">
+    <div>
+      <h2>Agendamentos</h2>
+      <p class="subtitle">Visitas e serviços, do agendamento até o pagamento.</p>
+    </div>
+    <button class="btn btn-primary" id="btnNovoAgendamento">+ Novo agendamento</button>
+  </div>
+
+  <div class="tabs" id="tabsStatus">
+    <button class="tab active" data-status="todos">Todos</button>
+    <button class="tab" data-status="agendado">Agendados</button>
+    <button class="tab" data-status="andamento">Em andamento</button>
+    <button class="tab" data-status="concluido">Concluídos</button>
+    <button class="tab" data-status="cancelado">Cancelados</button>
+  </div>
+
+  <div class="card">
+    <div id="tabelaAgendamentos">
+      <div class="empty-state"><div class="empty-icon">🗓️</div><p>Carregando...</p></div>
+    </div>
+  </div>
+</main>
+
+<!-- MODAL NOVO/EDITAR AGENDAMENTO -->
+<div class="modal-overlay" id="modalAgendamento">
+  <div class="modal-box">
+    <h3 id="modalTitulo">Novo agendamento</h3>
+    <form id="formAgendamento">
+      <input type="hidden" id="agendamentoId">
+
+      <div class="field">
+        <label>Nome do cliente</label>
+        <input type="text" id="campoNomeCliente" required placeholder="Ex: Maria Silva">
+      </div>
+      <div class="field">
+        <label>Telefone (WhatsApp)</label>
+        <input type="text" id="campoTelefoneCliente" required placeholder="(85) 9 9999-9999">
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Serviço</label>
+          <select id="campoTipoServico" required>
+            <option value="sofa">Sofá</option>
+            <option value="colchao">Colchão</option>
+            <option value="poltrona">Poltrona</option>
+            <option value="tapete">Tapete</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Data do serviço</label>
+          <input type="date" id="campoDataServico" required>
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Valor cobrado (R$)</label>
+          <input type="number" id="campoValor" step="0.01" min="0" required placeholder="120.00">
+        </div>
+        <div class="field">
+          <label>Custo do produto (R$)</label>
+          <input type="number" id="campoCusto" step="0.01" min="0" value="0">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Forma de pagamento</label>
+          <select id="campoFormaPagamento">
+            <option value="pix">Pix</option>
+            <option value="dinheiro">Dinheiro</option>
+            <option value="cartao">Cartão</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Status do pagamento</label>
+          <select id="campoStatusPagamento">
+            <option value="pendente">Pendente</option>
+            <option value="pago">Pago</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label>Observações</label>
+        <textarea id="campoObservacoes" rows="2" placeholder="Detalhes do serviço, bairro, etc."></textarea>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn btn-outline" id="btnCancelarModal">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Salvar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="../supabase-loader.js"></script>
+<script src="../config.js"></script>
+<script src="admin-data.js"></script>
+<script src="admin-sidebar.js"></script>
+<script>
+  protegerPagina();
+  montarSidebar("agendamentos");
+
+  const ICONES_SERVICO = { sofa: "🛋️", colchao: "🛏️", poltrona: "🪑", tapete: "🧶" };
+  const NOMES_SERVICO = { sofa: "Sofá", colchao: "Colchão", poltrona: "Poltrona", tapete: "Tapete" };
+
+  let agendamentosCache = [];
+  let filtroAtual = "todos";
+
+  async function carregarAgendamentos() {
+    const container = document.getElementById("tabelaAgendamentos");
+    try {
+      agendamentosCache = await listarAgendamentos({ limite: 300 });
+      renderizarTabela();
+    } catch (err) {
+      console.error(err);
+      container.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><p>Não foi possível carregar. Verifique a conexão com o Supabase.</p></div>`;
+    }
+  }
+
+  function renderizarTabela() {
+    const container = document.getElementById("tabelaAgendamentos");
+    const lista = filtroAtual === "todos"
+      ? agendamentosCache
+      : agendamentosCache.filter((a) => a.status === filtroAtual);
+
+    if (lista.length === 0) {
+      container.innerHTML = `<div class="empty-state"><div class="empty-icon">🗓️</div><p>Nenhum agendamento aqui ainda.</p></div>`;
+      return;
+    }
+
+    container.innerHTML = `
+      <table>
+        <thead>
+          <tr>
+            <th>Cliente</th><th>Serviço</th><th>Data</th><th>Valor</th><th>Pagamento</th><th>Status</th><th></th>
+          </tr>
+        </thead>
+        <tbody>
+          ${lista.map((a) => `
+            <tr>
+              <td>
+                <strong>${a.clientes?.nome || "Cliente"}</strong><br>
+                <span style="color:#8b97ab; font-size:0.78rem;">${a.clientes?.telefone || ""}</span>
+              </td>
+              <td>${ICONES_SERVICO[a.tipo_servico] || ""} ${NOMES_SERVICO[a.tipo_servico] || a.tipo_servico}</td>
+              <td>${formatarData(a.data_servico)}</td>
+              <td>${formatarMoeda(a.valor_cobrado)}</td>
+              <td><span class="badge badge-${a.status_pagamento === 'pago' ? 'pago' : 'pendente'}">${a.status_pagamento}</span></td>
+              <td>
+                <select class="select-status" data-id="${a.id}" style="border:1.5px solid #DDE3ED; border-radius:8px; padding:6px 10px; font-size:0.8rem; background:var(--creme-claro);">
+                  <option value="agendado" ${a.status === 'agendado' ? 'selected' : ''}>Agendado</option>
+                  <option value="andamento" ${a.status === 'andamento' ? 'selected' : ''}>Em andamento</option>
+                  <option value="concluido" ${a.status === 'concluido' ? 'selected' : ''}>Concluído</option>
+                  <option value="cancelado" ${a.status === 'cancelado' ? 'selected' : ''}>Cancelado</option>
+                </select>
+              </td>
+              <td>
+                <button class="btn-icon btn-editar" data-id="${a.id}" title="Editar">✏️</button>
+                <button class="btn-icon danger btn-excluir" data-id="${a.id}" title="Excluir">🗑️</button>
+              </td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>`;
+
+    document.querySelectorAll(".select-status").forEach((select) => {
+      select.addEventListener("change", async (e) => {
+        const id = e.target.dataset.id;
+        try {
+          await atualizarAgendamento(id, { status: e.target.value });
+          mostrarToast("Status atualizado.", "success");
+          await carregarAgendamentos();
+        } catch (err) {
+          mostrarToast("Erro ao atualizar status.", "error");
+        }
+      });
+    });
+
+    document.querySelectorAll(".btn-editar").forEach((btn) => {
+      btn.addEventListener("click", () => abrirModalEdicao(btn.dataset.id));
+    });
+
+    document.querySelectorAll(".btn-excluir").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        if (!confirm("Excluir este agendamento? Essa ação não pode ser desfeita.")) return;
+        try {
+          await excluirAgendamento(btn.dataset.id);
+          mostrarToast("Agendamento excluído.", "success");
+          await carregarAgendamentos();
+        } catch (err) {
+          mostrarToast("Erro ao excluir.", "error");
+        }
+      });
+    });
+  }
+
+  document.querySelectorAll("#tabsStatus .tab").forEach((tab) => {
+    tab.addEventListener("click", () => {
+      document.querySelectorAll("#tabsStatus .tab").forEach((t) => t.classList.remove("active"));
+      tab.classList.add("active");
+      filtroAtual = tab.dataset.status;
+      renderizarTabela();
+    });
+  });
+
+  // ----- MODAL -----
+  const modal = document.getElementById("modalAgendamento");
+  const form = document.getElementById("formAgendamento");
+
+  document.getElementById("btnNovoAgendamento").addEventListener("click", () => {
+    document.getElementById("modalTitulo").textContent = "Novo agendamento";
+    form.reset();
+    document.getElementById("agendamentoId").value = "";
+    document.getElementById("campoDataServico").value = new Date().toISOString().slice(0, 10);
+    modal.classList.add("open");
+  });
+
+  document.getElementById("btnCancelarModal").addEventListener("click", () => modal.classList.remove("open"));
+  modal.addEventListener("click", (e) => { if (e.target === modal) modal.classList.remove("open"); });
+
+  function abrirModalEdicao(id) {
+    const ag = agendamentosCache.find((a) => String(a.id) === String(id));
+    if (!ag) return;
+
+    document.getElementById("modalTitulo").textContent = "Editar agendamento";
+    document.getElementById("agendamentoId").value = ag.id;
+    document.getElementById("campoNomeCliente").value = ag.clientes?.nome || "";
+    document.getElementById("campoTelefoneCliente").value = ag.clientes?.telefone || "";
+    document.getElementById("campoTipoServico").value = ag.tipo_servico;
+    document.getElementById("campoDataServico").value = (ag.data_servico || "").slice(0, 10);
+    document.getElementById("campoValor").value = ag.valor_cobrado;
+    document.getElementById("campoCusto").value = ag.custo_produto || 0;
+    document.getElementById("campoFormaPagamento").value = ag.forma_pagamento || "pix";
+    document.getElementById("campoStatusPagamento").value = ag.status_pagamento || "pendente";
+    document.getElementById("campoObservacoes").value = ag.observacoes || "";
+    modal.classList.add("open");
+  }
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const id = document.getElementById("agendamentoId").value;
+
+    try {
+      const cliente = await buscarOuCriarCliente({
+        nome: document.getElementById("campoNomeCliente").value.trim(),
+        telefone: document.getElementById("campoTelefoneCliente").value.trim(),
+        bairro: null
+      });
+
+      const payload = {
+        cliente_id: cliente.id,
+        tipo_servico: document.getElementById("campoTipoServico").value,
+        data_servico: document.getElementById("campoDataServico").value,
+        valor_cobrado: parseFloat(document.getElementById("campoValor").value) || 0,
+        custo_produto: parseFloat(document.getElementById("campoCusto").value) || 0,
+        forma_pagamento: document.getElementById("campoFormaPagamento").value,
+        status_pagamento: document.getElementById("campoStatusPagamento").value,
+        observacoes: document.getElementById("campoObservacoes").value.trim()
+      };
+
+      if (id) {
+        await atualizarAgendamento(id, payload);
+        mostrarToast("Agendamento atualizado.", "success");
+      } else {
+        payload.status = STATUS_AGENDAMENTO.AGENDADO;
+        await criarAgendamento(payload);
+        mostrarToast("Agendamento criado.", "success");
+      }
+
+      modal.classList.remove("open");
+      await carregarAgendamentos();
+    } catch (err) {
+      console.error(err);
+      mostrarToast("Erro ao salvar agendamento.", "error");
+    }
+  });
+
+  carregarAgendamentos();
+</script>
+</body>
+</html>

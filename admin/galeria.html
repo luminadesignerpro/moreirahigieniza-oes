@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Galeria do Site — Painel Moreira Higienizações</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..900&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="admin-styles.css">
+<style>
+  .upload-zone {
+    border: 2px dashed #DDE3ED;
+    border-radius: 18px;
+    padding: 40px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-bottom: 28px;
+  }
+  .upload-zone:hover, .upload-zone.dragover { border-color: var(--azul-vapor); background: var(--creme-claro); }
+  .upload-zone .upload-icon { font-size: 2.4rem; margin-bottom: 12px; }
+  .upload-zone p { color: #6b7a93; font-size: 0.9rem; }
+  .upload-zone input { display: none; }
+
+  .fotos-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+  }
+  .foto-card {
+    border-radius: 14px;
+    overflow: hidden;
+    position: relative;
+    aspect-ratio: 1;
+    background: var(--creme-claro);
+  }
+  .foto-card img { width: 100%; height: 100%; object-fit: cover; }
+  .foto-card .foto-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, rgba(11,37,69,0.75), transparent 50%);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    display: flex;
+    align-items: flex-end;
+    justify-content: flex-end;
+    padding: 10px;
+  }
+  .foto-card:hover .foto-overlay { opacity: 1; }
+  .foto-card .btn-icon { background: rgba(255,255,255,0.9); }
+  @media (max-width: 980px) { .fotos-grid { grid-template-columns: repeat(2, 1fr); } }
+</style>
+</head>
+<body>
+
+<main class="main">
+  <div class="topbar">
+    <div>
+      <h2>Galeria do Site</h2>
+      <p class="subtitle">Gerencie as fotos de antes/depois exibidas na página pública — sem precisar de programador.</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="upload-zone" id="uploadZone">
+      <div class="upload-icon">📷</div>
+      <p><strong>Clique para escolher uma foto</strong> ou arraste e solte aqui</p>
+      <p style="font-size:0.78rem; margin-top:6px;">JPG ou PNG, até 5MB</p>
+      <input type="file" id="inputArquivo" accept="image/*">
+    </div>
+
+    <div class="card-header">
+      <div>
+        <h3>Fotos publicadas (<span id="contadorFotos">0</span>)</h3>
+        <p>Aparecem automaticamente na seção "Antes e depois" do site</p>
+      </div>
+    </div>
+
+    <div class="fotos-grid" id="fotosGrid">
+      <div class="empty-state" style="grid-column: 1/-1;"><div class="empty-icon">🖼️</div><p>Carregando...</p></div>
+    </div>
+  </div>
+</main>
+
+<script src="../supabase-loader.js"></script>
+<script src="../config.js"></script>
+<script src="admin-data.js"></script>
+<script src="admin-sidebar.js"></script>
+<script>
+  protegerPagina();
+  montarSidebar("galeria");
+
+  const uploadZone = document.getElementById("uploadZone");
+  const inputArquivo = document.getElementById("inputArquivo");
+
+  uploadZone.addEventListener("click", () => inputArquivo.click());
+
+  uploadZone.addEventListener("dragover", (e) => { e.preventDefault(); uploadZone.classList.add("dragover"); });
+  uploadZone.addEventListener("dragleave", () => uploadZone.classList.remove("dragover"));
+  uploadZone.addEventListener("drop", (e) => {
+    e.preventDefault();
+    uploadZone.classList.remove("dragover");
+    if (e.dataTransfer.files.length > 0) processarUpload(e.dataTransfer.files[0]);
+  });
+
+  inputArquivo.addEventListener("change", (e) => {
+    if (e.target.files.length > 0) processarUpload(e.target.files[0]);
+  });
+
+  async function processarUpload(arquivo) {
+    if (!arquivo.type.startsWith("image/")) {
+      mostrarToast("Envie apenas arquivos de imagem (JPG ou PNG).", "error");
+      return;
+    }
+    if (arquivo.size > 5 * 1024 * 1024) {
+      mostrarToast("A foto deve ter no máximo 5MB.", "error");
+      return;
+    }
+
+    mostrarToast("Enviando foto...");
+    try {
+      await enviarFotoGaleria(arquivo, "Antes e depois — Moreira Higienizações");
+      mostrarToast("Foto adicionada ao site!", "success");
+      inputArquivo.value = "";
+      await carregarFotos();
+    } catch (err) {
+      console.error(err);
+      mostrarToast("Erro ao enviar foto. Verifique a conexão com o Supabase.", "error");
+    }
+  }
+
+  async function carregarFotos() {
+    const grid = document.getElementById("fotosGrid");
+    try {
+      const fotos = await listarFotosGaleria();
+      document.getElementById("contadorFotos").textContent = fotos.length;
+
+      if (fotos.length === 0) {
+        grid.innerHTML = `<div class="empty-state" style="grid-column: 1/-1;"><div class="empty-icon">🖼️</div><p>Nenhuma foto ainda. Envie a primeira foto de antes/depois acima.</p></div>`;
+        return;
+      }
+
+      grid.innerHTML = fotos.map((foto) => `
+        <div class="foto-card">
+          <img src="${foto.url}" alt="${foto.descricao || ''}" loading="lazy">
+          <div class="foto-overlay">
+            <button class="btn-icon danger btn-excluir-foto" data-id="${foto.id}" data-caminho="${foto.caminho_arquivo}" title="Excluir">🗑️</button>
+          </div>
+        </div>
+      `).join("");
+
+      document.querySelectorAll(".btn-excluir-foto").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          if (!confirm("Remover esta foto do site?")) return;
+          try {
+            await excluirFotoGaleria(btn.dataset.id, btn.dataset.caminho);
+            mostrarToast("Foto removida.", "success");
+            await carregarFotos();
+          } catch (err) {
+            mostrarToast("Erro ao remover foto.", "error");
+          }
+        });
+      });
+    } catch (err) {
+      console.error(err);
+      grid.innerHTML = `<div class="empty-state" style="grid-column: 1/-1;"><div class="empty-icon">⚠️</div><p>Não foi possível carregar. Verifique a conexão com o Supabase.</p></div>`;
+    }
+  }
+
+  carregarFotos();
+</script>
+</body>
+</html>
