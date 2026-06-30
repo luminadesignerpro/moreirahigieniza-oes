@@ -38,7 +38,7 @@
     box-shadow: 0 30px 80px rgba(0,0,0,0.35);
   }
   .login-brand { text-align: center; margin-bottom: 28px; }
-  .login-brand img { width: 76px; height: 76px; border-radius: 50%; margin-bottom: 14px; }
+  .login-brand img { width: 120px; height: 120px; border-radius: 50%; margin-bottom: 14px; object-fit: cover; }
   .login-brand h1 {
     font-family: var(--font-display);
     color: var(--azul-marinho);
@@ -87,7 +87,7 @@
 
 <div class="login-card">
   <div class="login-brand">
-    <img src="../assets/selo-marca.jpg" alt="Moreira Higienizações">
+    <img src="../assets/novo-logo.jpg" alt="Moreira Higienizações">
     <h1>Painel Admin</h1>
     <p>Moreira Higienizações</p>
   </div>
@@ -96,8 +96,8 @@
 
   <form id="formLogin">
     <div class="field">
-      <label for="usuario">Usuário</label>
-      <input type="text" id="usuario" required autocomplete="username" placeholder="seu usuário">
+      <label for="usuario">E-mail</label>
+      <input type="text" id="usuario" required autocomplete="username" placeholder="seu e-mail">
     </div>
     <div class="field">
       <label for="senha">Senha</label>
@@ -129,19 +129,21 @@
     const senha = document.getElementById("senha").value;
 
     try {
-      const resposta = await fetch("/api/login.js", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ usuario, senha })
+      const supabase = await getSupabaseClient();
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: usuario,
+        password: senha
       });
 
-      const resultado = await resposta.json();
-
-      if (!resposta.ok || !resultado.sucesso) {
-        throw new Error(resultado.mensagem || "Usuário ou senha incorretos.");
+      if (error) {
+        throw new Error("E-mail ou senha incorretos.");
       }
 
-      sessionStorage.setItem("moreira_admin_usuario", JSON.stringify(resultado.usuario));
+      sessionStorage.setItem("moreira_admin_usuario", JSON.stringify({
+        id: data.user.id,
+        usuario: data.user.email,
+        nome: "Admin"
+      }));
       window.location.href = "dashboard.html";
     } catch (err) {
       erroMsg.textContent = err.message || "Não foi possível entrar. Tente novamente.";
