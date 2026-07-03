@@ -37,10 +37,6 @@ create table if not exists galeria (
   criado_em timestamptz default now()
 );
 
--- Se o banco já existe, adicione a coluna tipo manualmente:
--- ALTER TABLE galeria ADD COLUMN IF NOT EXISTS tipo text NOT NULL DEFAULT 'foto';
-
-
 -- ===== TABELA: USUÁRIOS DO ADMIN (login) =====
 create table if not exists usuarios_admin (
   id uuid primary key default gen_random_uuid(),
@@ -54,11 +50,6 @@ create table if not exists usuarios_admin (
 
 -- ============================================
 -- ROW LEVEL SECURITY (RLS)
--- O site público só LÊ clientes/agendamentos via funções serverless
--- (que usam a service_role key, sem RLS). A galeria pode ser lida
--- publicamente pelo site. O admin usa a anon key só para leitura/escrita
--- de dados não sensíveis (agendamentos, clientes, galeria) — login
--- sempre passa pela função serverless com service_role.
 -- ============================================
 
 alter table clientes enable row level security;
@@ -66,9 +57,14 @@ alter table agendamentos enable row level security;
 alter table galeria enable row level security;
 alter table usuarios_admin enable row level security;
 
--- Leitura/escrita liberada para clientes e agendamentos via anon key
--- (ambiente interno do admin; ajuste depois para usar autenticação
--- do Supabase Auth se quiser reforçar a segurança).
+-- Remove policies antigas para evitar erro de duplicidade
+drop policy if exists "permitir tudo clientes" on clientes;
+drop policy if exists "permitir tudo agendamentos" on agendamentos;
+drop policy if exists "leitura publica galeria" on galeria;
+drop policy if exists "escrita galeria" on galeria;
+drop policy if exists "exclusao galeria" on galeria;
+
+-- Recria as policies
 create policy "permitir tudo clientes" on clientes
   for all using (true) with check (true);
 
@@ -87,7 +83,6 @@ create policy "exclusao galeria" on galeria
 
 -- usuarios_admin: NENHUM acesso direto via anon key.
 -- Só a função serverless /api/login.js acessa, usando a service_role key.
--- (nenhuma policy = acesso bloqueado por padrão com RLS habilitado)
 
 -- ============================================
 -- STORAGE: bucket para fotos da galeria
@@ -98,10 +93,7 @@ create policy "exclusao galeria" on galeria
 
 -- ============================================
 -- USUÁRIO ADMIN INICIAL
--- Senha de exemplo: "moreira2026" — TROQUE depois de testar!
--- Hash gerado com SHA-256(senha + salt), mesmo padrão do api/login.js
--- Salt usado abaixo: "moreira-salt-inicial-2026"
--- Hash de "moreira2026moreira-salt-inicial-2026":
+-- Senha: "moreira2026" — TROQUE depois de testar!
 -- ============================================
 
 insert into usuarios_admin (usuario, nome, senha_hash, salt, ativo)
@@ -114,8 +106,7 @@ values (
 )
 on conflict (usuario) do nothing;
 
--- ✅ Hash já calculado e testado para a senha "moreira2026".
--- Login inicial: usuário "moreira" / senha "moreira2026"
+-- ✅ Login inicial: usuário "moreira" / senha "moreira2026"
 -- TROQUE a senha depois de testar! Para gerar um hash novo:
 --   node -e "console.log(require('crypto').createHash('sha256').update('SUASENHA'+'SEUSALT').digest('hex'))"
 -- e faça um UPDATE na tabela usuarios_admin com o novo senha_hash/salt.
