@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Clientes — Painel Moreira Higienizações</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..900&family=Work+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="admin-styles.css">
+</head>
+<body>
+
+<main class="main">
+  <div class="topbar">
+    <div>
+      <h2>Clientes</h2>
+      <p class="subtitle">Histórico e contato de quem já fechou serviço com você.</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div id="tabelaClientes">
+      <div class="empty-state"><div class="empty-icon">👥</div><p>Carregando...</p></div>
+    </div>
+  </div>
+</main>
+
+<script src="../supabase-loader.js"></script>
+<script src="../config.js"></script>
+<script src="admin-data.js"></script>
+<script src="admin-sidebar.js"></script>
+<script>
+  protegerPagina();
+  montarSidebar("clientes");
+
+  async function carregarClientes() {
+    const container = document.getElementById("tabelaClientes");
+    try {
+      const [clientes, agendamentos] = await Promise.all([
+        listarClientes(),
+        listarAgendamentos({ limite: 1000 })
+      ]);
+
+      if (clientes.length === 0) {
+        container.innerHTML = `<div class="empty-state"><div class="empty-icon">👥</div><p>Nenhum cliente cadastrado ainda. Eles aparecem aqui automaticamente quando um agendamento é criado.</p></div>`;
+        return;
+      }
+
+      const porCliente = {};
+      agendamentos.forEach((a) => {
+        if (!porCliente[a.cliente_id]) porCliente[a.cliente_id] = { qtd: 0, ultimo: null, gasto: 0 };
+        porCliente[a.cliente_id].qtd += 1;
+        porCliente[a.cliente_id].gasto += Number(a.valor_cobrado) || 0;
+        if (!porCliente[a.cliente_id].ultimo || a.data_servico > porCliente[a.cliente_id].ultimo) {
+          porCliente[a.cliente_id].ultimo = a.data_servico;
+        }
+      });
+
+      container.innerHTML = `
+        <table>
+          <thead>
+            <tr><th>Cliente</th><th>Telefone</th><th>Serviços feitos</th><th>Total gasto</th><th>Última visita</th><th></th></tr>
+          </thead>
+          <tbody>
+            ${clientes.map((c) => {
+              const info = porCliente[c.id] || { qtd: 0, ultimo: null, gasto: 0 };
+              return `
+                <tr>
+                  <td><strong>${c.nome}</strong></td>
+                  <td>${c.telefone}</td>
+                  <td>${info.qtd}</td>
+                  <td>${formatarMoeda(info.gasto)}</td>
+                  <td>${formatarData(info.ultimo)}</td>
+                  <td>
+                    <a class="btn-icon" href="${montarLinkWhatsApp('Olá ' + c.nome + ', tudo bem? Aqui é da Moreira Higienizações!')}" target="_blank" rel="noopener" title="Falar no WhatsApp">💬</a>
+                  </td>
+                </tr>`;
+            }).join("")}
+          </tbody>
+        </table>`;
+    } catch (err) {
+      console.error(err);
+      container.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><p>Não foi possível carregar. Verifique a conexão com o Supabase.</p></div>`;
+    }
+  }
+
+  carregarClientes();
+</script>
+</body>
+</html>

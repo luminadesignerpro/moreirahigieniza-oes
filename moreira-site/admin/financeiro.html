@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Financeiro — Painel Moreira Higienizações</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..900&family=Work+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="admin-styles.css">
+<style>
+  .mes-seletor {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: var(--branco);
+    padding: 8px 16px;
+    border-radius: 100px;
+    box-shadow: 0 2px 10px rgba(11,37,69,0.06);
+  }
+  .mes-seletor button {
+    background: var(--creme-claro);
+    border: none;
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    color: var(--azul-marinho);
+    font-weight: 700;
+  }
+  .mes-seletor button:hover { background: #e8e4d8; }
+  .mes-seletor .mes-label {
+    font-weight: 600;
+    color: var(--azul-marinho);
+    font-size: 0.92rem;
+    min-width: 130px;
+    text-align: center;
+  }
+  .pagamento-bars { display: flex; flex-direction: column; gap: 16px; }
+  .pagamento-row { display: flex; align-items: center; gap: 14px; }
+  .pagamento-icon { font-size: 1.3rem; width: 28px; }
+  .pagamento-info { flex: 1; }
+  .pagamento-info .nome { font-size: 0.85rem; font-weight: 600; color: var(--azul-marinho); margin-bottom: 6px; display:flex; justify-content:space-between; }
+  .pagamento-bar-bg { background: #ECEAE0; border-radius: 100px; height: 8px; overflow: hidden; }
+  .pagamento-bar-fill { height: 100%; border-radius: 100px; }
+</style>
+</head>
+<body>
+
+<main class="main">
+  <div class="topbar">
+    <div>
+      <h2>Financeiro</h2>
+      <p class="subtitle">Organização dos serviços feitos, receita e pendências.</p>
+    </div>
+    <div style="display:flex; gap:12px; align-items:center;">
+      <div class="mes-seletor">
+        <button id="btnMesAnterior">‹</button>
+        <span class="mes-label" id="mesAtualLabel">—</span>
+        <button id="btnMesProximo">›</button>
+      </div>
+      <button class="btn btn-gold" id="btnExportar">⬇ Exportar relatório</button>
+    </div>
+  </div>
+
+  <div class="metrics-grid">
+    <div class="metric-card accent">
+      <div class="metric-label">💰 Receita recebida</div>
+      <div class="metric-value" id="fReceita">R$ 0</div>
+      <div class="metric-delta" id="fServicosPagos">—</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">🧴 Custo de produtos</div>
+      <div class="metric-value" id="fCusto">R$ 0</div>
+      <div class="metric-delta">Descontado da receita</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">📈 Lucro líquido</div>
+      <div class="metric-value" id="fLucro">R$ 0</div>
+      <div class="metric-delta" id="fMargem">—</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">⏳ A receber</div>
+      <div class="metric-value" id="fPendente">R$ 0</div>
+      <div class="metric-delta" id="fPendenteQtd">—</div>
+    </div>
+  </div>
+
+  <div style="display:grid; grid-template-columns: 1.3fr 1fr; gap: 22px; margin-bottom: 22px;">
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h3>Serviços do mês</h3>
+          <p>Organização completa: data, cliente, valor e situação de pagamento</p>
+        </div>
+      </div>
+      <div id="tabelaFinanceiro">
+        <div class="empty-state"><div class="empty-icon">💰</div><p>Carregando...</p></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h3>Por forma de pagamento</h3>
+          <p>Recebido este mês</p>
+        </div>
+      </div>
+      <div class="pagamento-bars" id="pagamentoBars">
+        <div class="empty-state"><div class="empty-icon">💳</div><p>Carregando...</p></div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script src="../supabase-loader.js"></script>
+<script src="../config.js"></script>
+<script src="admin-data.js"></script>
+<script src="admin-sidebar.js"></script>
+<script>
+  protegerPagina();
+  montarSidebar("financeiro");
+
+  const NOMES_MES = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+  const ICONES_SERVICO = { sofa: "🛋️", colchao: "🛏️", poltrona: "🪑", tapete: "🧶" };
+  const NOMES_SERVICO = { sofa: "Sofá", colchao: "Colchão", poltrona: "Poltrona", tapete: "Tapete" };
+  const ICONES_PAGAMENTO = { pix: "📱", dinheiro: "💵", cartao: "💳" };
+  const NOMES_PAGAMENTO = { pix: "Pix", dinheiro: "Dinheiro", cartao: "Cartão" };
+  const CORES_PAGAMENTO = { pix: "#3D7BC4", dinheiro: "#2E9E6B", cartao: "#C99A4A" };
+
+  const agora = new Date();
+  let mesSelecionado = agora.getMonth();
+  let anoSelecionado = agora.getFullYear();
+  let agendamentosDoMes = [];
+
+  function atualizarLabelMes() {
+    document.getElementById("mesAtualLabel").textContent = `${NOMES_MES[mesSelecionado]} ${anoSelecionado}`;
+  }
+
+  document.getElementById("btnMesAnterior").addEventListener("click", () => {
+    mesSelecionado -= 1;
+    if (mesSelecionado < 0) { mesSelecionado = 11; anoSelecionado -= 1; }
+    atualizarLabelMes();
+    carregarFinanceiro();
+  });
+
+  document.getElementById("btnMesProximo").addEventListener("click", () => {
+    mesSelecionado += 1;
+    if (mesSelecionado > 11) { mesSelecionado = 0; anoSelecionado += 1; }
+    atualizarLabelMes();
+    carregarFinanceiro();
+  });
+
+  async function carregarFinanceiro() {
+    atualizarLabelMes();
+    try {
+      const resumo = await calcularResumoFinanceiro({ mes: mesSelecionado, ano: anoSelecionado });
+
+      document.getElementById("fReceita").textContent = formatarMoeda(resumo.receitaTotal);
+      document.getElementById("fServicosPagos").textContent = `${resumo.totalServicos - resumo.pendentes} serviço(s) pago(s)`;
+
+      document.getElementById("fCusto").textContent = formatarMoeda(resumo.custoTotal);
+
+      document.getElementById("fLucro").textContent = formatarMoeda(resumo.lucroLiquido);
+      const margem = resumo.receitaTotal > 0 ? ((resumo.lucroLiquido / resumo.receitaTotal) * 100).toFixed(0) : 0;
+      document.getElementById("fMargem").textContent = `Margem de ${margem}%`;
+      document.getElementById("fMargem").className = "metric-delta " + (resumo.lucroLiquido >= 0 ? "up" : "down");
+
+      document.getElementById("fPendente").textContent = formatarMoeda(resumo.valorPendente);
+      document.getElementById("fPendenteQtd").textContent = `${resumo.pendentes} serviço(s) pendente(s)`;
+
+      renderizarBarrasPagamento(resumo.porFormaPagamento, resumo.receitaTotal);
+
+      const inicio = new Date(anoSelecionado, mesSelecionado, 1).toISOString();
+      const fim = new Date(anoSelecionado, mesSelecionado + 1, 1).toISOString();
+      const todos = await listarAgendamentos({ limite: 1000 });
+      agendamentosDoMes = todos.filter((a) => a.data_servico >= inicio.slice(0,10) && a.data_servico < fim.slice(0,10));
+
+      renderizarTabelaFinanceiro(agendamentosDoMes);
+    } catch (err) {
+      console.error(err);
+      document.getElementById("tabelaFinanceiro").innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><p>Não foi possível carregar. Verifique a conexão com o Supabase.</p></div>`;
+    }
+  }
+
+  function renderizarBarrasPagamento(porForma, total) {
+    const container = document.getElementById("pagamentoBars");
+    if (total === 0) {
+      container.innerHTML = `<div class="empty-state"><div class="empty-icon">💳</div><p>Nenhum pagamento recebido neste mês ainda.</p></div>`;
+      return;
+    }
+
+    container.innerHTML = Object.entries(porForma).map(([forma, valor]) => {
+      const pct = total > 0 ? (valor / total) * 100 : 0;
+      return `
+        <div class="pagamento-row">
+          <div class="pagamento-icon">${ICONES_PAGAMENTO[forma]}</div>
+          <div class="pagamento-info">
+            <div class="nome"><span>${NOMES_PAGAMENTO[forma]}</span><span>${formatarMoeda(valor)}</span></div>
+            <div class="pagamento-bar-bg">
+              <div class="pagamento-bar-fill" style="width:${pct}%; background:${CORES_PAGAMENTO[forma]};"></div>
+            </div>
+          </div>
+        </div>`;
+    }).join("");
+  }
+
+  function renderizarTabelaFinanceiro(lista) {
+    const container = document.getElementById("tabelaFinanceiro");
+    if (lista.length === 0) {
+      container.innerHTML = `<div class="empty-state"><div class="empty-icon">💰</div><p>Nenhum serviço registrado neste mês.</p></div>`;
+      return;
+    }
+
+    const ordenada = [...lista].sort((a, b) => (b.data_servico || "").localeCompare(a.data_servico || ""));
+
+    container.innerHTML = `
+      <table>
+        <thead>
+          <tr><th>Data</th><th>Cliente</th><th>Serviço</th><th>Valor</th><th>Lucro</th><th>Pagamento</th></tr>
+        </thead>
+        <tbody>
+          ${ordenada.map((a) => {
+            const lucro = (Number(a.valor_cobrado) || 0) - (Number(a.custo_produto) || 0);
+            return `
+              <tr>
+                <td>${formatarData(a.data_servico)}</td>
+                <td>${a.clientes?.nome || "Cliente"}</td>
+                <td>${ICONES_SERVICO[a.tipo_servico] || ""} ${NOMES_SERVICO[a.tipo_servico] || a.tipo_servico}</td>
+                <td>${formatarMoeda(a.valor_cobrado)}</td>
+                <td style="color:${lucro >= 0 ? 'var(--verde-ok)' : 'var(--vermelho-erro)'}">${formatarMoeda(lucro)}</td>
+                <td>
+                  ${ICONES_PAGAMENTO[a.forma_pagamento] || ""}
+                  <span class="badge badge-${a.status_pagamento === 'pago' ? 'pago' : 'pendente'}">${a.status_pagamento}</span>
+                </td>
+              </tr>`;
+          }).join("")}
+        </tbody>
+      </table>`;
+  }
+
+  document.getElementById("btnExportar").addEventListener("click", () => {
+    if (agendamentosDoMes.length === 0) {
+      mostrarToast("Nenhum dado para exportar neste mês.", "error");
+      return;
+    }
+
+    const cabecalho = ["Data", "Cliente", "Telefone", "Serviço", "Valor Cobrado", "Custo Produto", "Lucro", "Forma Pagamento", "Status Pagamento"];
+    const linhas = agendamentosDoMes.map((a) => [
+      formatarData(a.data_servico),
+      a.clientes?.nome || "",
+      a.clientes?.telefone || "",
+      NOMES_SERVICO[a.tipo_servico] || a.tipo_servico,
+      (Number(a.valor_cobrado) || 0).toFixed(2),
+      (Number(a.custo_produto) || 0).toFixed(2),
+      ((Number(a.valor_cobrado) || 0) - (Number(a.custo_produto) || 0)).toFixed(2),
+      NOMES_PAGAMENTO[a.forma_pagamento] || "",
+      a.status_pagamento
+    ]);
+
+    const csv = [cabecalho, ...linhas].map((linha) => linha.map((v) => `"${v}"`).join(";")).join("\n");
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `financeiro-moreira-${NOMES_MES[mesSelecionado].toLowerCase()}-${anoSelecionado}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    mostrarToast("Relatório exportado.", "success");
+  });
+
+  carregarFinanceiro();
+</script>
+</body>
+</html>

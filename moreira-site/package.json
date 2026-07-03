@@ -1,0 +1,9 @@
+{
+  "name": "moreira-higienizacoes",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Site, painel admin e bot de WhatsApp para Moreira Higienizações",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.4"
+  }
+}
