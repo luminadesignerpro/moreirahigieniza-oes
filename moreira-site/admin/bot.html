@@ -126,6 +126,10 @@
     .bot-subnav { flex-direction: row; overflow-x: auto; }
     .phone-mock { max-width: 320px; margin: 0 auto; }
   }
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
 </style>
 </head>
 <body>
@@ -159,10 +163,35 @@
         <div class="card-header">
           <div><h3>Conectar aparelho</h3><p>Escaneie com o WhatsApp do número (85) 98900-2147</p></div>
         </div>
-        <div class="qr-box">
-          <div class="qr-placeholder">📷</div>
-          <p style="color:#6b7a93; font-size:0.88rem; margin-bottom:18px;">Escaneie este QR Code com a câmera do seu WhatsApp (Aparelhos Conectados)</p>
-          <button class="btn btn-outline" id="btnRecarregarQR">Recarregar QR Code</button>
+        <div class="qr-box" id="qrBox">
+          <!-- Estado inicial / carregando -->
+          <div id="qrLoading" style="display:none; flex-direction:column; align-items:center; gap:12px;">
+            <div style="font-size:2rem; animation: spin 1s linear infinite; display:inline-block;">⏳</div>
+            <p style="color:#6b7a93; font-size:0.88rem;">Gerando QR Code...</p>
+          </div>
+          <!-- QR Code real -->
+          <div id="qrReal" style="display:none; text-align:center;">
+            <img id="qrImg" src="" alt="QR Code WhatsApp" style="width:220px; height:220px; margin:0 auto 16px; border-radius:12px; border:3px solid #DDE3ED;">
+            <p style="color:#6b7a93; font-size:0.88rem; margin-bottom:18px;">Escaneie com o WhatsApp → Aparelhos Conectados</p>
+          </div>
+          <!-- Conectado -->
+          <div id="qrConectado" style="display:none; flex-direction:column; align-items:center; gap:12px; text-align:center;">
+            <div style="font-size:3rem;">✅</div>
+            <p style="color:#2e7d32; font-weight:700; font-size:1rem;">WhatsApp Conectado!</p>
+            <p style="color:#6b7a93; font-size:0.84rem;">O número está ativo e o bot está funcionando.</p>
+          </div>
+          <!-- Placeholder (sem config) -->
+          <div id="qrPlaceholder" style="display:flex; flex-direction:column; align-items:center; gap:12px; text-align:center;">
+            <div style="width:220px; height:220px; margin:0 auto; background:#f0f2f8; border-radius:12px; border:2px dashed #DDE3ED; display:flex; align-items:center; justify-content:center; font-size:3rem;">📲</div>
+            <p style="color:#6b7a93; font-size:0.88rem;">Configure a URL e chave da API abaixo e clique em <strong>Salvar &amp; Conectar</strong> para gerar o QR Code.</p>
+          </div>
+          <!-- Erro -->
+          <div id="qrErro" style="display:none; flex-direction:column; align-items:center; gap:12px; text-align:center;">
+            <div style="font-size:3rem;">⚠️</div>
+            <p style="color:#c8553d; font-size:0.88rem;" id="qrErroMsg">Não foi possível obter o QR Code.</p>
+          </div>
+          <p style="color:#6b7a93; font-size:0.88rem; margin-bottom:18px; margin-top:10px;">Escaneie este QR Code com a câmera do seu WhatsApp (Aparelhos Conectados)</p>
+          <button class="btn btn-outline" id="btnRecarregarQR">🔄 Recarregar QR Code</button>
         </div>
 
         <div class="card-header" style="margin-top:28px;">
@@ -383,7 +412,83 @@ Em breve ele te responde por aqui mesmo!`
 
   document.getElementById("btnReiniciarConversa").addEventListener("click", iniciarConversa);
 
-  // ----- CONEXÃO (placeholders salvos localmente; ligar à Evolution API real depois) -----
+  // ----- CONEXÃO — Evolution API -----
+  const configSalva = JSON.parse(localStorage.getItem("moreira_evolution_config") || "null");
+
+  function mostrarEstadoQR(estado, extra) {
+    document.getElementById('qrLoading').style.display = 'none';
+    document.getElementById('qrReal').style.display = 'none';
+    document.getElementById('qrConectado').style.display = 'none';
+    document.getElementById('qrPlaceholder').style.display = 'none';
+    document.getElementById('qrErro').style.display = 'none';
+
+    if (estado === 'loading') {
+      document.getElementById('qrLoading').style.display = 'flex';
+    } else if (estado === 'qr') {
+      const img = document.getElementById('qrImg');
+      img.src = extra; // pode ser base64 ou URL
+      document.getElementById('qrReal').style.display = 'block';
+    } else if (estado === 'connected') {
+      document.getElementById('qrConectado').style.display = 'flex';
+    } else if (estado === 'error') {
+      document.getElementById('qrErroMsg').textContent = extra || 'Não foi possível obter o QR Code.';
+      document.getElementById('qrErro').style.display = 'flex';
+    } else {
+      document.getElementById('qrPlaceholder').style.display = 'flex';
+    }
+  }
+
+  async function carregarQRCode() {
+    const cfg = JSON.parse(localStorage.getItem("moreira_evolution_config") || "null");
+    if (!cfg || !cfg.url || !cfg.key || !cfg.instancia) {
+      mostrarEstadoQR('placeholder');
+      return;
+    }
+
+    mostrarEstadoQR('loading');
+
+    try {
+      // Tentar obter o QR Code via Evolution API
+      const resp = await fetch(`${cfg.url}/instance/connect/${cfg.instancia}`, {
+        headers: {
+          'apikey': cfg.key,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const json = await resp.json();
+
+      // Evolution API retorna: { code: 'CONNECTED' } se já conectado
+      // ou { base64: 'data:image/png;base64,...' } com o QR
+      if (json.code === 'CONNECTED' || json.state === 'open') {
+        mostrarEstadoQR('connected');
+      } else if (json.base64) {
+        mostrarEstadoQR('qr', json.base64);
+        // Renovar QR a cada 30 segundos
+        setTimeout(carregarQRCode, 30000);
+      } else if (json.qrcode) {
+        mostrarEstadoQR('qr', json.qrcode);
+        setTimeout(carregarQRCode, 30000);
+      } else {
+        mostrarEstadoQR('error', 'Resposta inesperada da API. Verifique as configurações.');
+      }
+    } catch (err) {
+      console.error('Erro ao carregar QR Code:', err);
+      mostrarEstadoQR('error', `Erro ao conectar: ${err.message}. Verifique a URL e chave da API.`);
+    }
+  }
+
+  // Carregar campos salvos
+  if (configSalva) {
+    document.getElementById('campoApiUrl').value = configSalva.url || '';
+    document.getElementById('campoApiKey').value = configSalva.key || '';
+    document.getElementById('campoInstancia').value = configSalva.instancia || '';
+    carregarQRCode();
+  } else {
+    mostrarEstadoQR('placeholder');
+  }
+
   document.getElementById("btnSalvarConexao").addEventListener("click", () => {
     const url = document.getElementById("campoApiUrl").value.trim();
     const key = document.getElementById("campoApiKey").value.trim();
@@ -393,11 +498,13 @@ Em breve ele te responde por aqui mesmo!`
       return;
     }
     localStorage.setItem("moreira_evolution_config", JSON.stringify({ url, key, instancia }));
-    mostrarToast("Configuração salva. Escaneie o QR Code para conectar.", "success");
+    mostrarToast("Configuração salva! Carregando QR Code...");
+    carregarQRCode();
   });
 
   document.getElementById("btnRecarregarQR").addEventListener("click", () => {
     mostrarToast("Gerando novo QR Code...");
+    carregarQRCode();
   });
 
   iniciarConversa();
