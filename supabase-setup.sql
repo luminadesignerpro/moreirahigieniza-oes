@@ -33,8 +33,13 @@ create table if not exists galeria (
   url text not null,
   caminho_arquivo text,
   descricao text,
+  tipo text not null default 'foto', -- 'foto' ou 'video'
   criado_em timestamptz default now()
 );
+
+-- Se o banco já existe, adicione a coluna tipo manualmente:
+-- ALTER TABLE galeria ADD COLUMN IF NOT EXISTS tipo text NOT NULL DEFAULT 'foto';
+
 
 -- ===== TABELA: USUÁRIOS DO ADMIN (login) =====
 create table if not exists usuarios_admin (

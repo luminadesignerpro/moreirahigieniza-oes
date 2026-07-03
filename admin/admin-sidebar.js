@@ -16,7 +16,7 @@ function montarSidebar(paginaAtiva) {
     <button class="menu-toggle" id="menuToggle" aria-label="Abrir menu">☰</button>
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-brand">
-        <img src="../assets/selo-marca.jpg" alt="Moreira Higienizações">
+        <img src="../assets/banner-marca.jpg" alt="Moreira Higienizações">
         <div>
           <h1>Moreira</h1>
           <span>Painel Admin</span>

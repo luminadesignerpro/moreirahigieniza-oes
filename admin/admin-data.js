@@ -177,7 +177,7 @@ async function listarServicoMaisPedido() {
 // --------------------------------------------
 // GALERIA
 // --------------------------------------------
-async function listarFotosGaleria() {
+async function listarMidiasGaleria() {
   const supabase = await getSupabaseClient();
   const { data, error } = await supabase
     .from("galeria")
@@ -187,13 +187,13 @@ async function listarFotosGaleria() {
   return data || [];
 }
 
-async function enviarFotoGaleria(arquivo, descricao) {
+async function enviarMidiaGaleria(arquivo, descricao, tipo) {
   const supabase = await getSupabaseClient();
   const nomeArquivo = `${Date.now()}-${arquivo.name}`;
 
   const { error: erroUpload } = await supabase.storage
     .from("galeria-fotos")
-    .upload(nomeArquivo, arquivo);
+    .upload(nomeArquivo, arquivo, { cacheControl: '3600', upsert: false });
   if (erroUpload) throw erroUpload;
 
   const { data: urlData } = supabase.storage
@@ -202,14 +202,14 @@ async function enviarFotoGaleria(arquivo, descricao) {
 
   const { data, error } = await supabase
     .from("galeria")
-    .insert([{ url: urlData.publicUrl, descricao, caminho_arquivo: nomeArquivo }])
+    .insert([{ url: urlData.publicUrl, descricao, caminho_arquivo: nomeArquivo, tipo: tipo || 'foto' }])
     .select()
     .single();
   if (error) throw error;
   return data;
 }
 
-async function excluirFotoGaleria(id, caminhoArquivo) {
+async function excluirMidiaGaleria(id, caminhoArquivo) {
   const supabase = await getSupabaseClient();
 
   if (caminhoArquivo) {
@@ -219,6 +219,11 @@ async function excluirFotoGaleria(id, caminhoArquivo) {
   const { error } = await supabase.from("galeria").delete().eq("id", id);
   if (error) throw error;
 }
+
+// ---- retrocompat ----
+async function listarFotosGaleria() { return listarMidiasGaleria(); }
+async function enviarFotoGaleria(arquivo, descricao) { return enviarMidiaGaleria(arquivo, descricao, 'foto'); }
+async function excluirFotoGaleria(id, caminho) { return excluirMidiaGaleria(id, caminho); }
 
 // --------------------------------------------
 // FORMATAÇÃO

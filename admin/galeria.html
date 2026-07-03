@@ -8,6 +8,35 @@
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..900&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="admin-styles.css">
 <style>
+  /* Tabs de tipo */
+  .tipo-tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 22px;
+  }
+  .tipo-tab {
+    padding: 10px 22px;
+    border-radius: 8px;
+    border: 1.5px solid #DDE3ED;
+    background: var(--creme-claro);
+    font-size: 0.88rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    color: var(--azul-marinho);
+    font-family: var(--font-body);
+  }
+  .tipo-tab.active {
+    background: var(--azul-marinho);
+    color: var(--creme);
+    border-color: var(--azul-marinho);
+  }
+  .tipo-tab:hover:not(.active) {
+    background: var(--creme);
+    border-color: var(--azul-vapor);
+  }
+
+  /* Upload zone */
   .upload-zone {
     border: 2px dashed #DDE3ED;
     border-radius: 18px;
@@ -22,6 +51,25 @@
   .upload-zone p { color: #6b7a93; font-size: 0.9rem; }
   .upload-zone input { display: none; }
 
+  /* Progress bar */
+  .progress-bar-wrap {
+    width: 100%;
+    height: 6px;
+    background: #DDE3ED;
+    border-radius: 4px;
+    margin-top: 14px;
+    display: none;
+  }
+  .progress-bar-wrap.show { display: block; }
+  .progress-bar {
+    height: 100%;
+    background: var(--azul-vapor);
+    border-radius: 4px;
+    width: 0%;
+    transition: width 0.3s ease;
+  }
+
+  /* Grid fotos/vídeos */
   .fotos-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
@@ -34,7 +82,11 @@
     aspect-ratio: 1;
     background: var(--creme-claro);
   }
-  .foto-card img { width: 100%; height: 100%; object-fit: cover; }
+  .foto-card img, .foto-card video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
   .foto-card .foto-overlay {
     position: absolute;
     inset: 0;
@@ -45,9 +97,35 @@
     align-items: flex-end;
     justify-content: flex-end;
     padding: 10px;
+    gap: 6px;
   }
   .foto-card:hover .foto-overlay { opacity: 1; }
   .foto-card .btn-icon { background: rgba(255,255,255,0.9); }
+  .foto-card .tipo-badge {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    background: rgba(11,37,69,0.8);
+    color: white;
+    font-size: 0.68rem;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  /* Play icon sobre vídeos */
+  .video-play-icon {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.5rem;
+    pointer-events: none;
+    opacity: 0.85;
+  }
+
   @media (max-width: 980px) { .fotos-grid { grid-template-columns: repeat(2, 1fr); } }
 </style>
 </head>
@@ -57,21 +135,31 @@
   <div class="topbar">
     <div>
       <h2>Galeria do Site</h2>
-      <p class="subtitle">Gerencie as fotos de antes/depois exibidas na página pública — sem precisar de programador.</p>
+      <p class="subtitle">Gerencie as fotos e vídeos de antes/depois exibidos na página pública — sem precisar de programador.</p>
     </div>
   </div>
 
   <div class="card">
+    <!-- Tabs: Foto / Vídeo -->
+    <div class="tipo-tabs">
+      <button class="tipo-tab active" id="tabFoto" onclick="selecionarTipo('foto')">📷 Enviar Foto</button>
+      <button class="tipo-tab" id="tabVideo" onclick="selecionarTipo('video')">🎥 Enviar Vídeo</button>
+    </div>
+
+    <!-- Upload zone dinâmica -->
     <div class="upload-zone" id="uploadZone">
-      <div class="upload-icon">📷</div>
-      <p><strong>Clique para escolher uma foto</strong> ou arraste e solte aqui</p>
-      <p style="font-size:0.78rem; margin-top:6px;">JPG ou PNG, até 5MB</p>
+      <div class="upload-icon" id="uploadIcon">📷</div>
+      <p><strong id="uploadTitulo">Clique para escolher uma foto</strong> ou arraste e solte aqui</p>
+      <p id="uploadDica" style="font-size:0.78rem; margin-top:6px;">JPG ou PNG, até 5MB</p>
       <input type="file" id="inputArquivo" accept="image/*">
+      <div class="progress-bar-wrap" id="progressWrap">
+        <div class="progress-bar" id="progressBar"></div>
+      </div>
     </div>
 
     <div class="card-header">
       <div>
-        <h3>Fotos publicadas (<span id="contadorFotos">0</span>)</h3>
+        <h3>Publicados (<span id="contadorFotos">0</span>)</h3>
         <p>Aparecem automaticamente na seção "Antes e depois" do site</p>
       </div>
     </div>
@@ -90,11 +178,37 @@
   protegerPagina();
   montarSidebar("galeria");
 
+  let tipoAtual = 'foto'; // 'foto' ou 'video'
+
+  function selecionarTipo(tipo) {
+    tipoAtual = tipo;
+    document.getElementById('tabFoto').classList.toggle('active', tipo === 'foto');
+    document.getElementById('tabVideo').classList.toggle('active', tipo === 'video');
+
+    const input = document.getElementById('inputArquivo');
+    const icon = document.getElementById('uploadIcon');
+    const titulo = document.getElementById('uploadTitulo');
+    const dica = document.getElementById('uploadDica');
+
+    if (tipo === 'foto') {
+      input.accept = 'image/*';
+      icon.textContent = '📷';
+      titulo.textContent = 'Clique para escolher uma foto';
+      dica.textContent = 'JPG ou PNG, até 5MB';
+    } else {
+      input.accept = 'video/*';
+      icon.textContent = '🎥';
+      titulo.textContent = 'Clique para escolher um vídeo';
+      dica.textContent = 'MP4, MOV ou WebM, até 100MB';
+    }
+    // Reset input
+    input.value = '';
+  }
+
   const uploadZone = document.getElementById("uploadZone");
   const inputArquivo = document.getElementById("inputArquivo");
 
   uploadZone.addEventListener("click", () => inputArquivo.click());
-
   uploadZone.addEventListener("dragover", (e) => { e.preventDefault(); uploadZone.classList.add("dragover"); });
   uploadZone.addEventListener("dragleave", () => uploadZone.classList.remove("dragover"));
   uploadZone.addEventListener("drop", (e) => {
@@ -102,62 +216,97 @@
     uploadZone.classList.remove("dragover");
     if (e.dataTransfer.files.length > 0) processarUpload(e.dataTransfer.files[0]);
   });
-
   inputArquivo.addEventListener("change", (e) => {
     if (e.target.files.length > 0) processarUpload(e.target.files[0]);
   });
 
   async function processarUpload(arquivo) {
-    if (!arquivo.type.startsWith("image/")) {
-      mostrarToast("Envie apenas arquivos de imagem (JPG ou PNG).", "error");
-      return;
+    const eFoto = tipoAtual === 'foto';
+    const eVideo = tipoAtual === 'video';
+
+    if (eFoto && !arquivo.type.startsWith("image/")) {
+      mostrarToast("Envie apenas arquivos de imagem (JPG ou PNG).", "error"); return;
     }
-    if (arquivo.size > 5 * 1024 * 1024) {
-      mostrarToast("A foto deve ter no máximo 5MB.", "error");
-      return;
+    if (eVideo && !arquivo.type.startsWith("video/")) {
+      mostrarToast("Envie apenas arquivos de vídeo (MP4, MOV, WebM).", "error"); return;
     }
 
-    mostrarToast("Enviando foto...");
+    const limiteBytes = eFoto ? 5 * 1024 * 1024 : 100 * 1024 * 1024;
+    const limiteTxt = eFoto ? "5MB" : "100MB";
+    if (arquivo.size > limiteBytes) {
+      mostrarToast(`O arquivo deve ter no máximo ${limiteTxt}.`, "error"); return;
+    }
+
+    // Mostrar barra de progresso
+    const progressWrap = document.getElementById('progressWrap');
+    const progressBar = document.getElementById('progressBar');
+    progressWrap.classList.add('show');
+    progressBar.style.width = '10%';
+
+    mostrarToast(eFoto ? "Enviando foto..." : "Enviando vídeo (pode demorar)...");
     try {
-      await enviarFotoGaleria(arquivo, "Antes e depois — Moreira Higienizações");
-      mostrarToast("Foto adicionada ao site!", "success");
+      progressBar.style.width = '40%';
+      const descricao = eFoto
+        ? "Antes e depois — Moreira Higienizações"
+        : "Vídeo — Moreira Higienizações";
+
+      await enviarMidiaGaleria(arquivo, descricao, tipoAtual);
+
+      progressBar.style.width = '100%';
+      setTimeout(() => {
+        progressWrap.classList.remove('show');
+        progressBar.style.width = '0%';
+      }, 800);
+
+      mostrarToast(eFoto ? "Foto adicionada ao site!" : "Vídeo adicionado ao site!", "success");
       inputArquivo.value = "";
-      await carregarFotos();
+      await carregarMidias();
     } catch (err) {
       console.error(err);
-      mostrarToast("Erro ao enviar foto. Verifique a conexão com o Supabase.", "error");
+      progressWrap.classList.remove('show');
+      progressBar.style.width = '0%';
+      mostrarToast(`Erro ao enviar ${eFoto ? 'foto' : 'vídeo'}. Verifique a conexão com o Supabase.`, "error");
     }
   }
 
-  async function carregarFotos() {
+  async function carregarMidias() {
     const grid = document.getElementById("fotosGrid");
     try {
-      const fotos = await listarFotosGaleria();
-      document.getElementById("contadorFotos").textContent = fotos.length;
+      const itens = await listarMidiasGaleria();
+      document.getElementById("contadorFotos").textContent = itens.length;
 
-      if (fotos.length === 0) {
-        grid.innerHTML = `<div class="empty-state" style="grid-column: 1/-1;"><div class="empty-icon">🖼️</div><p>Nenhuma foto ainda. Envie a primeira foto de antes/depois acima.</p></div>`;
+      if (itens.length === 0) {
+        grid.innerHTML = `<div class="empty-state" style="grid-column: 1/-1;"><div class="empty-icon">🖼️</div><p>Nenhum item ainda. Envie a primeira foto ou vídeo de antes/depois acima.</p></div>`;
         return;
       }
 
-      grid.innerHTML = fotos.map((foto) => `
-        <div class="foto-card">
-          <img src="${foto.url}" alt="${foto.descricao || ''}" loading="lazy">
-          <div class="foto-overlay">
-            <button class="btn-icon danger btn-excluir-foto" data-id="${foto.id}" data-caminho="${foto.caminho_arquivo}" title="Excluir">🗑️</button>
+      grid.innerHTML = itens.map((item) => {
+        const eVideo = item.tipo === 'video';
+        const mediaHTML = eVideo
+          ? `<video src="${item.url}" preload="metadata" muted playsinline></video>
+             <div class="video-play-icon">▶️</div>`
+          : `<img src="${item.url}" alt="${item.descricao || ''}" loading="lazy">`;
+
+        return `
+          <div class="foto-card">
+            ${mediaHTML}
+            <span class="tipo-badge">${eVideo ? '🎥 Vídeo' : '📷 Foto'}</span>
+            <div class="foto-overlay">
+              <button class="btn-icon danger btn-excluir-foto" data-id="${item.id}" data-caminho="${item.caminho_arquivo}" title="Excluir">🗑️</button>
+            </div>
           </div>
-        </div>
-      `).join("");
+        `;
+      }).join("");
 
       document.querySelectorAll(".btn-excluir-foto").forEach((btn) => {
         btn.addEventListener("click", async () => {
-          if (!confirm("Remover esta foto do site?")) return;
+          if (!confirm("Remover este item do site?")) return;
           try {
-            await excluirFotoGaleria(btn.dataset.id, btn.dataset.caminho);
-            mostrarToast("Foto removida.", "success");
-            await carregarFotos();
+            await excluirMidiaGaleria(btn.dataset.id, btn.dataset.caminho);
+            mostrarToast("Item removido.", "success");
+            await carregarMidias();
           } catch (err) {
-            mostrarToast("Erro ao remover foto.", "error");
+            mostrarToast("Erro ao remover item.", "error");
           }
         });
       });
@@ -167,7 +316,7 @@
     }
   }
 
-  carregarFotos();
+  carregarMidias();
 </script>
 </body>
 </html>

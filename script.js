@@ -64,12 +64,25 @@ async function carregarGaleria() {
     if (!data || data.length === 0) return; // mantém as imagens padrão do HTML
 
     grid.innerHTML = "";
-    data.forEach((foto, index) => {
+    data.forEach((item, index) => {
       const div = document.createElement("div");
       div.className = "gallery-item reveal visible" + (index === 0 || index === 3 ? " tall" : "");
-      div.innerHTML = `<img src="${foto.url}" alt="${foto.descricao || 'Antes e depois Moreira Higienizações'}" loading="lazy"><div class="gallery-item-label">${foto.descricao || ''}</div>`;
+
+      const eVideo = item.tipo === 'video';
+      if (eVideo) {
+        div.innerHTML = `
+          <video src="${item.url}" autoplay muted loop playsinline style="width:100%;height:100%;object-fit:cover;"></video>
+          <div class="gallery-item-label" style="position:absolute;bottom:0;left:0;right:0;background:linear-gradient(to top,rgba(11,37,69,0.7),transparent);color:white;padding:10px 12px;font-size:0.75rem;">
+            ${item.descricao || ''}
+          </div>
+          <div style="position:absolute;top:8px;right:8px;background:rgba(11,37,69,0.75);color:white;font-size:0.65rem;font-weight:700;padding:3px 8px;border-radius:4px;">▶ VÍDEO</div>
+        `;
+      } else {
+        div.innerHTML = `<img src="${item.url}" alt="${item.descricao || 'Antes e depois Moreira Higienizações'}" loading="lazy"><div class="gallery-item-label">${item.descricao || ''}</div>`;
+      }
       grid.appendChild(div);
     });
+
   } catch (err) {
     console.warn("Galeria: usando imagens padrão (Supabase ainda não configurado ou vazio).", err);
   }
