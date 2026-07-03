@@ -96,8 +96,8 @@
 
   <form id="formLogin">
     <div class="field">
-      <label for="usuario">E-mail</label>
-      <input type="text" id="usuario" required autocomplete="username" placeholder="seu e-mail">
+      <label for="usuario">Usuário</label>
+      <input type="text" id="usuario" required autocomplete="username" placeholder="seu usuário">
     </div>
     <div class="field">
       <label for="senha">Senha</label>
@@ -107,8 +107,6 @@
   </form>
 </div>
 
-<script src="../supabase-loader.js"></script>
-<script src="../config.js"></script>
 <script>
   const formLogin = document.getElementById("formLogin");
   const erroMsg = document.getElementById("erroMsg");
@@ -129,21 +127,19 @@
     const senha = document.getElementById("senha").value;
 
     try {
-      const supabase = await getSupabaseClient();
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: usuario,
-        password: senha
+      const res = await fetch("/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ usuario, senha })
       });
 
-      if (error) {
-        throw new Error("E-mail ou senha incorretos.");
+      const data = await res.json();
+
+      if (!data.sucesso) {
+        throw new Error(data.mensagem || "Usuário ou senha incorretos.");
       }
 
-      sessionStorage.setItem("moreira_admin_usuario", JSON.stringify({
-        id: data.user.id,
-        usuario: data.user.email,
-        nome: "Admin"
-      }));
+      sessionStorage.setItem("moreira_admin_usuario", JSON.stringify(data.usuario));
       window.location.href = "dashboard.html";
     } catch (err) {
       erroMsg.textContent = err.message || "Não foi possível entrar. Tente novamente.";
