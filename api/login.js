@@ -5,8 +5,13 @@
 // Variáveis de ambiente necessárias na Vercel:
 //   SUPABASE_URL
 //   SUPABASE_SERVICE_ROLE_KEY  (não a anon key!)
+//
+// ⚠️ VERSÃO TEMPORÁRIA DE DEBUG ⚠️
+// Essa versão mostra o erro real na tela de login pra
+// descobrirmos a causa do "Erro interno ao tentar entrar".
+// Depois de descobrir o problema, troque de volta pela
+// versão original (sem o campo "detalhe" na resposta).
 // ============================================
-
 const crypto = require("crypto");
 const { createClient } = require("@supabase/supabase-js");
 
@@ -47,7 +52,6 @@ module.exports = async (req, res) => {
     }
 
     const hashCalculado = gerarHash(senha, registro.salt);
-
     if (hashCalculado !== registro.senha_hash) {
       res.status(401).json({ sucesso: false, mensagem: "Usuário ou senha incorretos." });
       return;
@@ -59,6 +63,11 @@ module.exports = async (req, res) => {
     });
   } catch (err) {
     console.error("Erro no login:", err);
-    res.status(500).json({ sucesso: false, mensagem: "Erro interno ao tentar entrar." });
+    // ⚠️ DEBUG: mostrando o erro real temporariamente para diagnóstico.
+    res.status(500).json({
+      sucesso: false,
+      mensagem: "Erro interno ao tentar entrar.",
+      detalhe: err.message || String(err)
+    });
   }
 };
