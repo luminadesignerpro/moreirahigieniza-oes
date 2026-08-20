@@ -1,4 +1,4 @@
-// ============================================
+  // ============================================
 // ADMIN — CAMADA DE DADOS (Supabase)
 // Funções compartilhadas entre todas as páginas
 // do painel admin. Tabelas usadas:
@@ -6,6 +6,7 @@
 //   - agendamentos   (1 serviço = 1 agendamento)
 //   - galeria
 //   - usuarios_admin (login)
+//   - bot_config     (fluxo do WhatsApp Bot + config Evolution API)
 // ============================================
 
 const STATUS_AGENDAMENTO = {
@@ -226,6 +227,35 @@ async function enviarFotoGaleria(arquivo, descricao) { return enviarMidiaGaleria
 async function excluirFotoGaleria(id, caminho) { return excluirMidiaGaleria(id, caminho); }
 
 // --------------------------------------------
+// BOT — configuração da Evolution API + fluxo de mensagens
+// Guardado na tabela bot_config (linha única, id = 1) para
+// que tanto o painel quanto a função de webhook no servidor
+// enxerguem a mesma configuração.
+// --------------------------------------------
+async function obterConfigBot() {
+  const supabase = await getSupabaseClient();
+  const { data, error } = await supabase
+    .from("bot_config")
+    .select("*")
+    .eq("id", 1)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+async function salvarConfigBot(campos) {
+  const supabase = await getSupabaseClient();
+  const { data, error } = await supabase
+    .from("bot_config")
+    .update({ ...campos, atualizado_em: new Date().toISOString() })
+    .eq("id", 1)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+// --------------------------------------------
 // FORMATAÇÃO
 // --------------------------------------------
 function formatarMoeda(valor) {
@@ -253,4 +283,4 @@ function mostrarToast(mensagem, tipo = "default") {
   toast.textContent = mensagem;
   container.appendChild(toast);
   setTimeout(() => toast.remove(), 3500);
-}
+} 
