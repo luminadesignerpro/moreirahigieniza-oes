@@ -81,6 +81,14 @@
     display: none;
   }
   .erro-msg.show { display: block; }
+  .erro-detalhe {
+    display: block;
+    margin-top: 8px;
+    font-size: 0.72rem;
+    font-family: monospace;
+    word-break: break-word;
+    opacity: 0.85;
+  }
 </style>
 </head>
 <body>
@@ -120,6 +128,7 @@
   formLogin.addEventListener("submit", async (e) => {
     e.preventDefault();
     erroMsg.classList.remove("show");
+    erroMsg.innerHTML = "";
     btnLogin.disabled = true;
     btnLogin.textContent = "Entrando...";
 
@@ -136,13 +145,22 @@
       const data = await res.json();
 
       if (!data.sucesso) {
-        throw new Error(data.mensagem || "Usuário ou senha incorretos.");
+        const erro = new Error(data.mensagem || "Usuário ou senha incorretos.");
+        erro.detalhe = data.detalhe;
+        throw erro;
       }
 
       sessionStorage.setItem("moreira_admin_usuario", JSON.stringify(data.usuario));
       window.location.href = "dashboard.html";
     } catch (err) {
       erroMsg.textContent = err.message || "Não foi possível entrar. Tente novamente.";
+      // ⚠️ DEBUG: mostra o detalhe técnico do erro, se existir.
+      if (err.detalhe) {
+        const detalheEl = document.createElement("span");
+        detalheEl.className = "erro-detalhe";
+        detalheEl.textContent = err.detalhe;
+        erroMsg.appendChild(detalheEl);
+      }
       erroMsg.classList.add("show");
       btnLogin.disabled = false;
       btnLogin.textContent = "Entrar";
