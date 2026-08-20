@@ -210,6 +210,10 @@
           <input type="text" id="campoInstancia" placeholder="Ex: moreira-higienizacoes">
         </div>
         <button class="btn btn-primary" id="btnSalvarConexao">Salvar &amp; Conectar</button>
+        <p style="color:#8b97ab; font-size:0.78rem; margin-top:10px;">
+          Depois de conectar, configure na sua Evolution API o webhook desta instância apontando para:<br>
+          <code id="webhookUrlTexto" style="font-family:'JetBrains Mono',monospace; font-size:0.74rem;"></code>
+        </p>
       </div>
 
       <!-- SEÇÃO FLUXO -->
@@ -294,6 +298,10 @@
   protegerPagina();
   montarSidebar("bot");
 
+  // Mostra pro usuário pra onde apontar o webhook na Evolution API
+  document.getElementById("webhookUrlTexto").textContent =
+    `${window.location.origin}/api/whatsapp-webhook`;
+
   // ----- NAVEGAÇÃO ENTRE SUBSEÇÕES -----
   document.querySelectorAll(".bot-subnav .nav-item").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -304,59 +312,48 @@
     });
   });
 
-  // ----- TEXTOS PADRÃO DO FLUXO (editáveis e salvos no localStorage por simplicidade aqui;
-  //       trocar por tabela "fluxo_bot" no Supabase quando a Evolution API estiver configurada) -----
-  const FLUXO_PADRAO = {
-    boasVindas: `Olá! Seja bem-vindo(a) à Moreira Higienizações! 🛋️✨
+  // ----- FLUXO DO BOT — agora salvo no Supabase (tabela bot_config),
+  //       assim tanto o painel quanto o webhook do servidor enxergam
+  //       a mesma configuração. -----
+  let fluxoAtual = null;
+  let configBotAtual = null;
 
-Eu sou a Bella, assistente virtual. Como posso te ajudar hoje?
+  async function carregarConfigBot() {
+    try {
+      const cfg = await obterConfigBot();
+      configBotAtual = cfg;
 
-Digite o número da opção desejada:
-*1* - 💰 Pedir orçamento
-*2* - 🗓️ Agendar visita
-*3* - 📋 Ver serviços e preços
-*4* - 🙋 Falar com atendente`,
-    orcamento: `Ótimo! Vamos calcular seu orçamento. 💰
+      fluxoAtual = {
+        boasVindas: cfg.fluxo_boas_vindas,
+        orcamento: cfg.fluxo_orcamento,
+        agendamento: cfg.fluxo_agendamento,
+        servicos: cfg.fluxo_servicos,
+        atendente: cfg.fluxo_atendente
+      };
 
-Me conta:
-1. O que você quer higienizar? (sofá, colchão, poltrona ou tapete)
-2. Se for sofá, quantos lugares tem?
+      document.getElementById("fluxoBoasVindas").value = fluxoAtual.boasVindas;
+      document.getElementById("fluxoOrcamento").value = fluxoAtual.orcamento;
+      document.getElementById("fluxoAgendamento").value = fluxoAtual.agendamento;
+      document.getElementById("fluxoServicos").value = fluxoAtual.servicos;
+      document.getElementById("fluxoAtendente").value = fluxoAtual.atendente;
 
-Em poucos minutos te mando o valor estimado!`,
-    agendamento: `Perfeito! Vamos agendar sua visita. 🗓️
+      document.getElementById("campoApiUrl").value = cfg.evolution_url || "";
+      document.getElementById("campoApiKey").value = cfg.evolution_key || "";
+      document.getElementById("campoInstancia").value = cfg.evolution_instancia || "";
 
-Preciso de algumas informações:
-1. Seu nome completo
-2. Endereço (bairro) em Fortaleza
-3. Dia e horário de preferência
-
-Confirmamos o agendamento por aqui mesmo!`,
-    servicos: `📋 *Nossos serviços e valores:*
-
-🛋️ Sofá: a partir de R$ 60 por lugar
-🛏️ Colchão: a partir de R$ 90
-🪑 Poltrona: a partir de R$ 70
-🧶 Tapete: sob consulta
-
-💳 Aceitamos Pix, dinheiro e cartão.`,
-    atendente: `Tudo bem! Já vou te transferir para o Moreira. 🙋
-
-Em breve ele te responde por aqui mesmo!`
-  };
-
-  function carregarFluxoSalvo() {
-    const salvo = JSON.parse(localStorage.getItem("moreira_fluxo_bot") || "null") || FLUXO_PADRAO;
-    document.getElementById("fluxoBoasVindas").value = salvo.boasVindas;
-    document.getElementById("fluxoOrcamento").value = salvo.orcamento;
-    document.getElementById("fluxoAgendamento").value = salvo.agendamento;
-    document.getElementById("fluxoServicos").value = salvo.servicos;
-    document.getElementById("fluxoAtendente").value = salvo.atendente;
-    return salvo;
+      if (cfg.evolution_url && cfg.evolution_key && cfg.evolution_instancia) {
+        carregarQRCode();
+      } else {
+        mostrarEstadoQR("placeholder");
+      }
+    } catch (err) {
+      console.error("Erro ao carregar configuração do bot:", err);
+      mostrarToast("Não foi possível carregar a configuração do bot.", "error");
+    }
+    iniciarConversa();
   }
 
-  let fluxoAtual = carregarFluxoSalvo();
-
-  document.getElementById("btnSalvarFluxo").addEventListener("click", () => {
+  document.getElementById("btnSalvarFluxo").addEventListener("click", async () => {
     fluxoAtual = {
       boasVindas: document.getElementById("fluxoBoasVindas").value,
       orcamento: document.getElementById("fluxoOrcamento").value,
@@ -364,8 +361,19 @@ Em breve ele te responde por aqui mesmo!`
       servicos: document.getElementById("fluxoServicos").value,
       atendente: document.getElementById("fluxoAtendente").value
     };
-    localStorage.setItem("moreira_fluxo_bot", JSON.stringify(fluxoAtual));
-    mostrarToast("Fluxo do bot salvo!", "success");
+    try {
+      await salvarConfigBot({
+        fluxo_boas_vindas: fluxoAtual.boasVindas,
+        fluxo_orcamento: fluxoAtual.orcamento,
+        fluxo_agendamento: fluxoAtual.agendamento,
+        fluxo_servicos: fluxoAtual.servicos,
+        fluxo_atendente: fluxoAtual.atendente
+      });
+      mostrarToast("Fluxo do bot salvo!", "success");
+    } catch (err) {
+      console.error("Erro ao salvar fluxo:", err);
+      mostrarToast("Não foi possível salvar o fluxo.", "error");
+    }
   });
 
   // ----- SIMULADOR DE CHAT -----
@@ -381,6 +389,7 @@ Em breve ele te responde por aqui mesmo!`
   }
 
   function iniciarConversa() {
+    if (!fluxoAtual) return;
     phoneMessages.innerHTML = "";
     setTimeout(() => adicionarMensagem(fluxoAtual.boasVindas, "bot"), 200);
   }
@@ -404,7 +413,7 @@ Em breve ele te responde por aqui mesmo!`
 
   function enviarMensagemTeste() {
     const valor = phoneInput.value.trim();
-    if (!valor) return;
+    if (!valor || !fluxoAtual) return;
     adicionarMensagem(valor, "user");
     phoneInput.value = "";
     processarResposta(valor);
@@ -412,9 +421,7 @@ Em breve ele te responde por aqui mesmo!`
 
   document.getElementById("btnReiniciarConversa").addEventListener("click", iniciarConversa);
 
-  // ----- CONEXÃO — Evolution API -----
-  const configSalva = JSON.parse(localStorage.getItem("moreira_evolution_config") || "null");
-
+  // ----- CONEXÃO — Evolution API (config lida/salva no Supabase) -----
   function mostrarEstadoQR(estado, extra) {
     document.getElementById('qrLoading').style.display = 'none';
     document.getElementById('qrReal').style.display = 'none';
@@ -439,8 +446,8 @@ Em breve ele te responde por aqui mesmo!`
   }
 
   async function carregarQRCode() {
-    const cfg = JSON.parse(localStorage.getItem("moreira_evolution_config") || "null");
-    if (!cfg || !cfg.url || !cfg.key || !cfg.instancia) {
+    const cfg = configBotAtual;
+    if (!cfg || !cfg.evolution_url || !cfg.evolution_key || !cfg.evolution_instancia) {
       mostrarEstadoQR('placeholder');
       return;
     }
@@ -448,10 +455,9 @@ Em breve ele te responde por aqui mesmo!`
     mostrarEstadoQR('loading');
 
     try {
-      // Tentar obter o QR Code via Evolution API
-      const resp = await fetch(`${cfg.url}/instance/connect/${cfg.instancia}`, {
+      const resp = await fetch(`${cfg.evolution_url}/instance/connect/${cfg.evolution_instancia}`, {
         headers: {
-          'apikey': cfg.key,
+          'apikey': cfg.evolution_key,
           'Content-Type': 'application/json'
         }
       });
@@ -459,13 +465,10 @@ Em breve ele te responde por aqui mesmo!`
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const json = await resp.json();
 
-      // Evolution API retorna: { code: 'CONNECTED' } se já conectado
-      // ou { base64: 'data:image/png;base64,...' } com o QR
       if (json.code === 'CONNECTED' || json.state === 'open') {
         mostrarEstadoQR('connected');
       } else if (json.base64) {
         mostrarEstadoQR('qr', json.base64);
-        // Renovar QR a cada 30 segundos
         setTimeout(carregarQRCode, 30000);
       } else if (json.qrcode) {
         mostrarEstadoQR('qr', json.qrcode);
@@ -479,17 +482,7 @@ Em breve ele te responde por aqui mesmo!`
     }
   }
 
-  // Carregar campos salvos
-  if (configSalva) {
-    document.getElementById('campoApiUrl').value = configSalva.url || '';
-    document.getElementById('campoApiKey').value = configSalva.key || '';
-    document.getElementById('campoInstancia').value = configSalva.instancia || '';
-    carregarQRCode();
-  } else {
-    mostrarEstadoQR('placeholder');
-  }
-
-  document.getElementById("btnSalvarConexao").addEventListener("click", () => {
+  document.getElementById("btnSalvarConexao").addEventListener("click", async () => {
     const url = document.getElementById("campoApiUrl").value.trim();
     const key = document.getElementById("campoApiKey").value.trim();
     const instancia = document.getElementById("campoInstancia").value.trim();
@@ -497,9 +490,18 @@ Em breve ele te responde por aqui mesmo!`
       mostrarToast("Preencha URL, token e nome da instância.", "error");
       return;
     }
-    localStorage.setItem("moreira_evolution_config", JSON.stringify({ url, key, instancia }));
-    mostrarToast("Configuração salva! Carregando QR Code...");
-    carregarQRCode();
+    try {
+      configBotAtual = await salvarConfigBot({
+        evolution_url: url,
+        evolution_key: key,
+        evolution_instancia: instancia
+      });
+      mostrarToast("Configuração salva! Carregando QR Code...");
+      carregarQRCode();
+    } catch (err) {
+      console.error("Erro ao salvar configuração:", err);
+      mostrarToast("Não foi possível salvar a configuração.", "error");
+    }
   });
 
   document.getElementById("btnRecarregarQR").addEventListener("click", () => {
@@ -507,7 +509,7 @@ Em breve ele te responde por aqui mesmo!`
     carregarQRCode();
   });
 
-  iniciarConversa();
+  carregarConfigBot();
 </script>
 </body>
 </html>
