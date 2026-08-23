@@ -89,16 +89,39 @@
     word-break: break-word;
     opacity: 0.85;
   }
+  .login-wrap { display: flex; flex-direction: column; align-items: center; gap: 16px; width: 100%; max-width: 400px; }
+  .btn-voltar-site {
+    position: fixed;
+    top: 16px;
+    left: 16px;
+    z-index: 20;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--creme);
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.22);
+    padding: 9px 14px;
+    border-radius: 999px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: background 0.2s ease;
+  }
+  .btn-voltar-site:hover { background: rgba(255,255,255,0.18); }
 </style>
 </head>
 <body>
 
-<div class="login-card">
-  <div class="login-brand">
-    <img src="../assets/selo-marca.png" alt="Moreira Higienizações">
-    <h1>Painel Admin</h1>
-    <p>Moreira Higienizações</p>
-  </div>
+<div class="login-wrap">
+  <a href="../index.html" class="btn-voltar-site">&larr; Voltar ao site</a>
+
+  <div class="login-card">
+    <div class="login-brand">
+      <img src="../assets/selo-marca.png" alt="Moreira Higienizações">
+      <h1>Painel Admin</h1>
+      <p>Moreira Higienizações</p>
+    </div>
 
   <div class="erro-msg" id="erroMsg"></div>
 
@@ -113,6 +136,7 @@
     </div>
     <button type="submit" class="btn-login" id="btnLogin">Entrar</button>
   </form>
+  </div>
 </div>
 
 <script>
