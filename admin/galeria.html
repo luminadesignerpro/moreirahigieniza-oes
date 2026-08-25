@@ -265,7 +265,8 @@
       console.error(err);
       progressWrap.classList.remove('show');
       progressBar.style.width = '0%';
-      mostrarToast(`Erro ao enviar ${eFoto ? 'foto' : 'vídeo'}. Verifique a conexão com o Supabase.`, "error");
+      const detalhe = (err && (err.message || err.error_description || err.statusText)) || "erro desconhecido";
+      mostrarToast(`Erro ao enviar ${eFoto ? 'foto' : 'vídeo'}: ${detalhe}`, "error");
     }
   }
 
