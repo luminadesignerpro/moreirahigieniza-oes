@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Moreira Higienizações — Higienização Profissional de Estofados</title>
+<meta name="description" content="Higienização profissional de sofás, colchões, poltronas e tapetes em Fortaleza e região metropolitana. Orçamento grátis pelo WhatsApp.">
+
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0B2545">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Moreira Higienizações">
+<link rel="apple-touch-icon" href="/assets/moreira-icon-192.png">
+<link rel="icon" type="image/png" sizes="192x192" href="/assets/moreira-icon-192.png">
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js').catch((err) => console.warn('SW registration failed:', err));
+    });
+  }
+</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,700;1,400;1,600&family=Inter:wght@300;400;500;600;700&family=Syne:wght@600;700&display=swap" rel="stylesheet">
+
+<style>
+  /* ============================================================
+     TOKENS
+  ============================================================ */
+  :root{
+    --navy:#0B2545;
+    --navy-deep:#071A33;
+    --cream:#F5F2EA;
+    --cream-light:#FAFAF6;
+    --blue:#2E6DB4;
+    --blue-muted:#7A9ABF;
+    --gold:#BF8C3A;
+    --gold-light:#D4AA6A;
+    --text:#1C1C1E;
+    --text-muted:#5A6880;
+    --white:#FFFFFF;
+    --border:rgba(11,37,69,0.08);
+
+    --f-display:'Playfair Display', serif;
+    --f-sans:'Inter', sans-serif;
+    --f-head:'Syne', sans-serif;
+
+    /* espaçamento fluido — cresce com a tela, sem quebrar no mobile */
+    --space-section: clamp(56px, 9vw, 112px);
+    --space-lg: clamp(24px, 4vw, 40px);
+    --gutter: clamp(18px, 5vw, 28px);
+
+    --header-h: 68px;
+  }
+
+  *{ margin:0; padding:0; box-sizing:border-box; }
+  html{ scroll-behavior:smooth; }
+  html, body{ max-width:100%; overflow-x:hidden; } /* trava overflow horizontal de vez */
+
+  body{
+    font-family:var(--f-sans);
+    background:var(--cream-light);
+    color:var(--text);
+    line-height:1.65;
+    -webkit-font-smoothing:antialiased;
+  }
+  a{ text-decoration:none; color:inherit; }
+  img{ max-width:100%; display:block; }
+  button{ font-family:inherit; }
+  ul{ list-style:none; }
+
+  .container{
+    width:100%;
+    max-width:1160px;
+    margin:0 auto;
+    padding:0 var(--gutter);
+  }
+
+  :focus-visible{
+    outline:2px solid var(--gold);
+    outline-offset:3px;
+  }
+
+  /* ============================================================
+     HEADER — mobile-first, nunca estoura a tela
+  ============================================================ */
+  header{
+    position:fixed;
+    top:0; left:0; right:0;
+    z-index:200;
+    height:var(--header-h);
+    background:rgba(245,242,234,0.95);
+    backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--border);
+    transition:box-shadow .3s;
+  }
+  header.scrolled{ box-shadow:0 2px 20px rgba(11,37,69,.09); }
+
+  .header-inner{
+    height:100%;
+    max-width:1160px;
+    margin:0 auto;
+    padding:0 var(--gutter);
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+  }
+
+  .logo-mark{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    min-width:0; /* permite que o texto trunque em vez de empurrar o layout */
+  }
+  .logo-img-wrap{
+    width:42px;
+    height:42px;
+    border-radius:50%;
+    overflow:hidden;
+    border:2px solid var(--gold);
+    flex-shrink:0;
+  }
+  .logo-img-wrap img{ width:100%; height:100%; object-fit:cover; }
+  .logo-text-block{ line-height:1.15; min-width:0; }
+  .logo-name{
+    font-family:var(--f-head);
+    font-size:.92rem;
+    font-weight:700;
+    color:var(--navy);
+    white-space:nowrap;
+  }
+  .logo-sub{
+    font-size:.56rem;
+    font-weight:600;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--blue);
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+
+  /* nav desktop — some no mobile, nunca fica espremido */
+  nav.nav-desktop{ display:none; }
+  nav.nav-desktop ul{ display:flex; gap:26px; align-items:center; }
+  nav.nav-desktop a{
+    font-size:.86rem; font-weight:500; color:var(--navy);
+    position:relative; padding-bottom:2px; white-space:nowrap;
+  }
+  nav.nav-desktop a::after{
+    content:''; position:absolute; left:0; bottom:-3px; width:0; height:1.5px;
+    background:var(--gold); transition:width .25s ease;
+  }
+  nav.nav-desktop a:hover::after{ width:100%; }
+
+  .header-actions{ display:flex; align-items:center; gap:8px; flex-shrink:0; }
+
+  .btn-admin{
+    display:none;
+    font-size:.76rem; font-weight:500; color:var(--text-muted);
+    padding:7px 13px; border:1px solid var(--border); border-radius:6px;
+    transition:all .2s; white-space:nowrap;
+  }
+  .btn-admin:hover{ color:var(--navy); border-color:rgba(11,37,69,.2); background:rgba(11,37,69,.04); }
+
+  .btn-whatsapp-header{
+    background:var(--navy); color:var(--cream);
+    padding:8px 14px; border-radius:6px; font-weight:600; font-size:.78rem;
+    display:flex; align-items:center; gap:6px; white-space:nowrap;
+    transition:background .25s, transform .2s;
+  }
+  .btn-whatsapp-header svg{ width:14px; height:14px; fill:currentColor; flex-shrink:0; }
+  .btn-whatsapp-header:hover{ background:var(--blue); transform:translateY(-1px); }
+  .btn-whatsapp-header .full-label{ display:none; }
+
+  .nav-toggle{
+    display:flex; align-items:center; justify-content:center;
+    width:38px; height:38px; flex-shrink:0;
+    background:none; border:1px solid var(--border); border-radius:6px; cursor:pointer;
+  }
+  .nav-toggle svg{ width:18px; height:18px; }
+  .nav-toggle .icon-close{ display:none; }
+  .nav-toggle[aria-expanded="true"] .icon-open{ display:none; }
+  .nav-toggle[aria-expanded="true"] .icon-close{ display:block; }
+
+  /* menu mobile — painel real, não dropdown apertado */
+  .mobile-nav{
+    position:fixed;
+    top:var(--header-h); left:0; right:0;
+    max-height:0;
+    overflow:hidden;
+    background:var(--cream-light);
+    border-bottom:1px solid var(--border);
+    box-shadow:0 12px 24px rgba(11,37,69,.08);
+    transition:max-height .3s ease;
+    z-index:190;
+  }
+  .mobile-nav.open{ max-height:420px; }
+  .mobile-nav-inner{ padding:8px var(--gutter) 20px; display:flex; flex-direction:column; }
+  .mobile-nav a{
+    padding:13px 4px; font-weight:500; font-size:1rem; color:var(--navy);
+    border-bottom:1px solid var(--border);
+  }
+  .mobile-nav a:last-of-type{ border-bottom:none; }
+  .mobile-nav .btn-admin{ display:block; margin-top:14px; text-align:center; }
+
+  /* ============================================================
+     HERO
+  ============================================================ */
+  .hero{
+    padding:calc(var(--header-h) + 40px) 0 var(--space-section);
+    position:relative;
+    overflow:hidden;
+    background:var(--cream-light);
+  }
+  .hero::before{
+    content:'';
+    position:absolute; inset:0;
+    background-image:repeating-linear-gradient(0deg, transparent, transparent 80px, rgba(11,37,69,.025) 80px, rgba(11,37,69,.025) 81px);
+    pointer-events:none;
+  }
+  .hero-grid{
+    display:grid;
+    grid-template-columns:1fr;
+    gap:44px;
+    align-items:center;
+    position:relative; z-index:2;
+  }
+  .hero-visual{ order:-1; display:flex; justify-content:center; }
+  .hero-seal-outer{ width:min(260px, 60vw); aspect-ratio:1; position:relative; }
+  .hero-seal-ring{
+    width:100%; height:100%; border-radius:50%; overflow:hidden;
+    border:4px solid var(--gold);
+    box-shadow:0 18px 44px rgba(11,37,69,.22), 0 0 0 10px rgba(191,140,58,.08), 0 0 0 20px rgba(191,140,58,.04);
+    animation:float 7s ease-in-out infinite;
+  }
+  .hero-seal-ring img{ width:100%; height:100%; object-fit:cover; }
+  @keyframes float{ 0%,100%{transform:translateY(0);} 50%{transform:translateY(-8px);} }
+
+  .eyebrow{
+    font-size:.68rem; font-weight:700; letter-spacing:.14em; text-transform:uppercase;
+    color:var(--gold); display:flex; align-items:center; gap:9px; margin-bottom:16px;
+  }
+  .eyebrow::before{ content:''; width:26px; height:1px; background:var(--gold); flex-shrink:0; }
+
+  .hero h1{
+    font-family:var(--f-display);
+    font-size:clamp(2rem, 7vw, 3.8rem);
+    font-weight:700; color:var(--navy);
+    line-height:1.1; letter-spacing:-.01em;
+    margin-bottom:18px;
+  }
+  .hero h1 em{ font-style:italic; font-weight:400; color:var(--blue); }
+
+  .hero p.lead{
+    font-size:1rem; color:var(--text-muted);
+    max-width:460px; margin-bottom:30px; font-weight:300; line-height:1.7;
+  }
+
+  .hero-ctas{ display:flex; gap:12px; flex-wrap:wrap; }
+  .btn-primary, .btn-outline, .btn-gold, .btn-ghost{
+    padding:14px 24px; border-radius:6px; font-weight:600; font-size:.92rem;
+    display:inline-flex; align-items:center; gap:9px; transition:background .25s, transform .2s, box-shadow .25s;
+  }
+  .btn-primary{
+    background:var(--navy); color:var(--cream);
+    box-shadow:0 4px 16px rgba(11,37,69,.2);
+  }
+  .btn-primary svg, .btn-outline svg, .btn-gold svg{ width:16px; height:16px; flex-shrink:0; }
+  .btn-primary:hover{ background:var(--blue); transform:translateY(-2px); }
+  .btn-outline{ border:1.5px solid var(--navy); color:var(--navy); font-weight:500; }
+  .btn-outline:hover{ background:var(--navy); color:var(--cream); }
+
+  .hero-trust{
+    margin-top:34px; display:flex; gap:20px; flex-wrap:wrap;
+  }
+  .trust-item{ display:flex; flex-direction:column; gap:2px; }
+  .trust-num{ font-family:var(--f-display); font-size:1.5rem; font-weight:700; color:var(--navy); }
+  .trust-label{ font-size:.72rem; color:var(--text-muted); }
+
+  /* ============================================================
+     SECTION SHELL
+  ============================================================ */
+  .section{ padding:var(--space-section) 0; position:relative; }
+  .section-dark{ background:var(--navy); }
+
+  .section-head{ max-width:580px; margin-bottom:var(--space-lg); }
+  .section-head h2{
+    font-family:var(--f-display);
+    font-size:clamp(1.6rem, 5vw, 2.6rem);
+    color:var(--navy); font-weight:700; line-height:1.15; margin-top:10px;
+  }
+  .section-head p{ margin-top:12px; color:var(--text-muted); font-size:.96rem; }
+  .section-dark .section-head h2{ color:var(--cream); }
+  .section-dark .section-head p{ color:var(--blue-muted); }
+  .section-dark .eyebrow{ color:var(--gold-light); }
+  .section-dark .eyebrow::before{ background:var(--gold-light); }
+
+  /* ============================================================
+     SERVICES
+  ============================================================ */
+  .services-grid{ display:grid; grid-template-columns:1fr; gap:16px; }
+  .service-card{
+    background:var(--white); border-radius:12px; padding:26px 22px;
+    border:1px solid var(--border);
+    transition:transform .3s, box-shadow .3s, border-color .3s;
+  }
+  .service-card:hover{ transform:translateY(-4px); box-shadow:0 16px 40px -10px rgba(11,37,69,.16); border-color:var(--gold); }
+  .service-icon-wrap{
+    width:48px; height:48px; border-radius:12px; background:var(--cream);
+    display:flex; align-items:center; justify-content:center; margin-bottom:16px;
+  }
+  .service-icon-wrap svg{ width:24px; height:24px; }
+  .service-card h3{ font-family:var(--f-head); font-size:1rem; color:var(--navy); margin-bottom:7px; font-weight:700; }
+  .service-card p{ font-size:.86rem; color:var(--text-muted); margin-bottom:14px; }
+  .service-cta{ font-size:.78rem; color:var(--gold); font-weight:600; letter-spacing:.03em; font-family:var(--f-head); display:inline-flex; align-items:center; gap:5px; }
+
+  /* ============================================================
+     SIMULADOR
+  ============================================================ */
+  .simulador-box{
+    background:var(--white); border:1px solid var(--border); border-radius:16px;
+    padding:24px; max-width:520px;
+    display:flex; flex-direction:column; gap:16px;
+    box-shadow:0 16px 40px -18px rgba(11,37,69,.18);
+  }
+  .simulador-field{ display:flex; flex-direction:column; gap:6px; }
+  .simulador-field label{ font-size:.82rem; font-weight:600; color:var(--navy); }
+  .simulador-field select, .simulador-field input{
+    font-family:var(--f-sans); font-size:.95rem; color:var(--text);
+    padding:12px 14px; border:1.5px solid var(--border); border-radius:8px;
+    background:var(--cream-light); appearance:none;
+  }
+  .simulador-field select:focus, .simulador-field input:focus{ border-color:var(--gold); }
+  .simulador-resultado{
+    background:var(--cream); border-radius:10px; padding:18px;
+    display:flex; flex-direction:column; gap:4px; text-align:center;
+  }
+  .simulador-resultado-label{ font-size:.72rem; text-transform:uppercase; letter-spacing:.08em; color:var(--text-muted); font-weight:600; }
+  .simulador-resultado-valor{ font-family:var(--f-display); font-size:2.2rem; font-weight:700; color:var(--navy); }
+  .simulador-obs{ font-size:.76rem; color:var(--text-muted); margin-top:4px; }
+  .simulador-box .btn-primary{ justify-content:center; }
+
+  /* ============================================================
+     PROCESS
+  ============================================================ */
+  .process-grid{ display:grid; grid-template-columns:1fr; gap:26px; }
+  .process-step{ padding-left:0; position:relative; }
+  .process-num{
+    font-family:var(--f-display); font-size:1.8rem; color:var(--gold-light);
+    font-weight:700; margin-bottom:8px; line-height:1; font-style:italic;
+  }
+  .process-step h4{
+    font-family:var(--f-head); font-size:.9rem; margin-bottom:6px; color:var(--cream);
+    font-weight:700; text-transform:uppercase; letter-spacing:.04em;
+  }
+  .process-step p{ font-size:.86rem; color:var(--blue-muted); line-height:1.55; }
+
+  /* ============================================================
+     GALLERY
+  ============================================================ */
+  .gallery-grid{ display:grid; grid-template-columns:repeat(2, 1fr); gap:10px; }
+  .gallery-item{
+    border-radius:10px; overflow:hidden; position:relative; aspect-ratio:1;
+    background:linear-gradient(135deg, #1a3a5c, var(--navy));
+    display:flex; align-items:center; justify-content:center; flex-direction:column; gap:8px;
+  }
+  .gallery-item img{ width:100%; height:100%; object-fit:cover; transition:transform .4s ease; }
+  .gallery-item:hover img{ transform:scale(1.04); }
+  .gallery-placeholder{
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px;
+    width:100%; height:100%; color:rgba(255,255,255,.35); text-align:center; padding:14px;
+  }
+  .gallery-placeholder svg{ width:28px; height:28px; opacity:.4; }
+  .gallery-placeholder span{ font-size:.62rem; font-family:var(--f-head); letter-spacing:.06em; text-transform:uppercase; opacity:.5; }
+  .gallery-item-label{
+    position:absolute; bottom:0; left:0; right:0;
+    background:linear-gradient(to top, rgba(11,37,69,.75), transparent);
+    color:white; padding:10px 12px; font-size:.75rem; font-weight:500;
+  }
+
+  /* ============================================================
+     INSTAGRAM STRIP
+  ============================================================ */
+  .instagram-strip{ background:linear-gradient(135deg, #833ab4, #fd1d1d, #fcb045); padding:22px 0; }
+  .instagram-inner{ display:flex; align-items:center; justify-content:center; gap:14px; flex-wrap:wrap; text-align:center; }
+  .instagram-inner svg{ fill:white; flex-shrink:0; }
+  .instagram-inner p{ color:white; font-size:.9rem; font-weight:500; }
+  .instagram-inner a{ background:white; color:#833ab4; padding:9px 20px; border-radius:6px; font-weight:700; font-size:.84rem; transition:transform .2s, opacity .2s; }
+  .instagram-inner a:hover{ transform:translateY(-2px); opacity:.9; }
+
+  /* ============================================================
+     TESTIMONIALS
+  ============================================================ */
+  .testimonials-grid{ display:grid; grid-template-columns:1fr; gap:16px; }
+  .testimonial-card{
+    background:var(--cream-light); border-radius:12px; padding:24px;
+    border:1px solid var(--border); position:relative;
+  }
+  .testimonial-card::before{
+    content:'"'; position:absolute; top:10px; right:18px;
+    font-family:var(--f-display); font-size:3.4rem; color:var(--border); line-height:1; font-style:italic;
+  }
+  .stars{ color:var(--gold); font-size:.8rem; margin-bottom:12px; letter-spacing:3px; }
+  .testimonial-card p.quote{ font-size:.9rem; color:var(--text); margin-bottom:18px; line-height:1.6; font-style:italic; }
+  .testimonial-author{ display:flex; align-items:center; gap:10px; }
+  .author-initial{
+    width:34px; height:34px; border-radius:50%; background:var(--navy); color:var(--cream);
+    display:flex; align-items:center; justify-content:center; font-weight:700; font-size:.78rem;
+    font-family:var(--f-head); flex-shrink:0;
+  }
+  .author-name{ font-weight:600; font-size:.82rem; color:var(--navy); }
+  .author-loc{ font-size:.72rem; color:var(--text-muted); }
+
+  /* ============================================================
+     CTA FINAL
+  ============================================================ */
+  .cta-block{
+    background:var(--navy); border-radius:16px; padding:56px 26px; text-align:center;
+    position:relative; overflow:hidden;
+  }
+  .cta-block::before{
+    content:''; position:absolute; inset:0;
+    background:radial-gradient(ellipse at 60% 0%, rgba(46,109,180,.18) 0%, transparent 70%);
+    pointer-events:none;
+  }
+  .cta-block h2{
+    font-family:var(--f-display); font-size:clamp(1.6rem, 6vw, 2.7rem); color:var(--cream);
+    font-weight:700; margin-bottom:14px; position:relative; z-index:2;
+  }
+  .cta-block p{ color:var(--blue-muted); margin-bottom:28px; font-size:.95rem; position:relative; z-index:2; }
+  .cta-buttons{ display:flex; gap:12px; justify-content:center; flex-wrap:wrap; position:relative; z-index:2; }
+  .btn-gold{ background:var(--gold); color:var(--navy-deep); font-weight:700; }
+  .btn-gold:hover{ background:var(--gold-light); transform:translateY(-2px); }
+  .btn-ghost{ border:1.5px solid rgba(255,255,255,.2); color:var(--cream); font-weight:500; padding:14px 24px; border-radius:6px; }
+  .btn-ghost:hover{ background:rgba(255,255,255,.08); border-color:rgba(255,255,255,.35); }
+
+  /* ============================================================
+     FOOTER
+  ============================================================ */
+  footer{ background:var(--navy-deep); color:var(--blue-muted); padding:44px 0 24px; }
+  .footer-grid{ display:grid; grid-template-columns:1fr; gap:32px; margin-bottom:32px; }
+  .footer-brand{ display:flex; gap:12px; align-items:flex-start; }
+  .footer-brand-img{ width:40px; height:40px; border-radius:50%; overflow:hidden; border:1.5px solid var(--gold); flex-shrink:0; }
+  .footer-brand-img img{ width:100%; height:100%; object-fit:cover; }
+  .footer-brand h4{ font-family:var(--f-head); color:var(--cream); font-size:.95rem; margin-bottom:5px; font-weight:700; }
+  .footer-brand p{ font-size:.8rem; max-width:280px; line-height:1.6; }
+  .footer-col h5{ color:var(--cream); font-family:var(--f-head); font-size:.72rem; margin-bottom:14px; letter-spacing:.09em; text-transform:uppercase; font-weight:700; }
+  .footer-col a{ display:block; font-size:.83rem; margin-bottom:9px; color:var(--blue-muted); transition:color .2s; }
+  .footer-col a:hover{ color:var(--gold-light); }
+  .footer-bottom{
+    border-top:1px solid rgba(255,255,255,.06); padding-top:18px;
+    display:flex; flex-direction:column; gap:8px; font-size:.72rem; text-align:center;
+  }
+  .footer-bottom a{ color:var(--blue-muted); }
+  .footer-bottom a:hover{ color:var(--gold-light); }
+
+  /* ============================================================
+     WHATSAPP FLOAT — respeita safe-area no iPhone
+  ============================================================ */
+  .whatsapp-float{
+    position:fixed;
+    bottom:calc(20px + env(safe-area-inset-bottom));
+    right:calc(18px + env(safe-area-inset-right));
+    z-index:300;
+    background:#25D366;
+    width:54px; height:54px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    box-shadow:0 6px 20px rgba(37,211,102,.45);
+    animation:wapulse 2.8s infinite;
+  }
+  @keyframes wapulse{
+    0%{ box-shadow:0 6px 20px rgba(37,211,102,.45); }
+    50%{ box-shadow:0 6px 20px rgba(37,211,102,.45), 0 0 0 10px rgba(37,211,102,.1); }
+    100%{ box-shadow:0 6px 20px rgba(37,211,102,.45); }
+  }
+  .whatsapp-float svg{ width:24px; height:24px; fill:white; }
+
+  /* ============================================================
+     REVEAL ON SCROLL
+  ============================================================ */
+  .reveal{ opacity:0; transform:translateY(16px); transition:opacity .6s ease, transform .6s ease; }
+  .reveal.visible{ opacity:1; transform:translateY(0); }
+  @media (prefers-reduced-motion: reduce){
+    .reveal{ opacity:1; transform:none; transition:none; }
+    .hero-seal-ring, .whatsapp-float{ animation:none; }
+  }
+
+  /* ============================================================
+     BREAKPOINTS — de pequeno pra grande (mobile-first de verdade)
+  ============================================================ */
+
+  /* >= 480px: telefones maiores */
+  @media (min-width:480px){
+    .services-grid{ grid-template-columns:repeat(2, 1fr); }
+    .testimonials-grid{ grid-template-columns:repeat(2, 1fr); }
+  }
+
+  /* >= 640px: começa a mostrar mais rótulos completos */
+  @media (min-width:640px){
+    .btn-whatsapp-header .full-label{ display:inline; }
+    .btn-whatsapp-header .short-label{ display:none; }
+    .gallery-grid{ grid-template-columns:repeat(3, 1fr); }
+  }
+
+  /* >= 768px: tablet — header já pode respirar mais, mas nav ainda no menu */
+  @media (min-width:768px){
+    :root{ --header-h:76px; }
+    .logo-img-wrap{ width:52px; height:52px; }
+    .logo-name{ font-size:1rem; }
+    .logo-sub{ font-size:.6rem; }
+    .btn-admin{ display:inline-block; }
+    .process-grid{ grid-template-columns:repeat(2, 1fr); }
+    .footer-grid{ grid-template-columns:1.4fr 1fr 1fr; }
+    .footer-bottom{ flex-direction:row; justify-content:space-between; text-align:left; }
+  }
+
+  /* >= 960px: nav desktop aparece, menu mobile desaparece de vez */
+  @media (min-width:960px){
+    :root{ --header-h:84px; }
+    .logo-img-wrap{ width:60px; height:60px; }
+    .logo-name{ font-size:1.05rem; }
+    nav.nav-desktop{ display:block; }
+    .nav-toggle{ display:none; }
+    .mobile-nav{ display:none; }
+
+    .hero{ padding-top:calc(var(--header-h) + 60px); }
+    .hero-grid{ grid-template-columns:1.05fr .95fr; gap:60px; }
+    .hero-visual{ order:0; }
+    .hero-seal-outer{ width:min(420px, 90%); }
+    .hero p.lead{ font-size:1.05rem; }
+
+    .services-grid{ grid-template-columns:repeat(4, 1fr); }
+    .process-grid{ grid-template-columns:repeat(4, 1fr); gap:0; }
+    .process-step{ padding:0 22px; position:relative; }
+    .process-step:not(:last-child)::after{
+      content:'→'; position:absolute; top:6px; right:-4px; color:var(--blue-muted); font-size:1rem;
+    }
+    .gallery-grid{ grid-template-columns:repeat(4, 1fr); grid-template-rows:repeat(2, 200px); }
+    .gallery-item{ aspect-ratio:auto; }
+    .gallery-item.tall{ grid-row:span 2; }
+    .testimonials-grid{ grid-template-columns:repeat(3, 1fr); }
+    .cta-block{ padding:72px 60px; }
+  }
+
+  @media (min-width:1160px){
+    .gallery-grid{ grid-template-rows:repeat(2, 220px); }
+  }
+</style>
+</head>
+<body>
+
+  <!-- ============ HEADER ============ -->
+  <header id="siteHeader">
+    <div class="header-inner">
+      <a href="#topo" class="logo-mark">
+        <div class="logo-img-wrap">
+          <img src="assets/selo-marca.png" alt="Moreira Higienizações">
+        </div>
+        <div class="logo-text-block">
+          <span class="logo-name">Moreira</span>
+          <span class="logo-sub">Higienizações</span>
+        </div>
+      </a>
+
+      <nav class="nav-desktop" aria-label="Navegação principal">
+        <ul>
+          <li><a href="#servicos">Serviços</a></li>
+          <li><a href="#simulador">Simulador</a></li>
+          <li><a href="#como-funciona">Como funciona</a></li>
+          <li><a href="#galeria">Antes e depois</a></li>
+          <li><a href="#depoimentos">Depoimentos</a></li>
+        </ul>
+      </nav>
+
+      <div class="header-actions">
+        <a href="admin/login.html" class="btn-admin">Painel Admin</a>
+        <a href="#" class="btn-whatsapp-header" id="btnHeaderWhats" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91C21.95 6.45 17.5 2 12.04 2zm5.8 14.1c-.24.68-1.4 1.3-1.94 1.38-.5.08-1.12.11-1.8-.11-.42-.13-.95-.31-1.64-.6-2.88-1.24-4.76-4.15-4.9-4.34-.14-.19-1.17-1.56-1.17-2.98s.73-2.11 1-2.4c.26-.29.56-.36.75-.36h.55c.18 0 .42-.02.64.5.24.56.8 1.95.87 2.09.07.14.11.31.02.5-.1.19-.14.31-.28.48-.14.17-.29.37-.42.5-.14.14-.28.29-.12.57.16.28.71 1.17 1.53 1.9 1.05.94 1.94 1.23 2.22 1.37.28.14.44.12.6-.07.17-.19.71-.83.9-1.11.19-.28.38-.24.63-.14.26.1 1.63.77 1.91.91.28.14.47.21.54.33.07.12.07.68-.17 1.36z"/></svg>
+          <span class="full-label">Falar no WhatsApp</span>
+          <span class="short-label">WhatsApp</span>
+        </a>
+        <button class="nav-toggle" id="navToggle" aria-label="Abrir menu" aria-expanded="false">
+          <svg class="icon-open" viewBox="0 0 24 24" fill="none" stroke="#0B2545" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+          <svg class="icon-close" viewBox="0 0 24 24" fill="none" stroke="#0B2545" stroke-width="2" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="6" y1="18" x2="18" y2="6"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="mobile-nav" id="mobileNav">
+      <div class="mobile-nav-inner">
+        <a href="#servicos">Serviços</a>
+        <a href="#simulador">Simulador</a>
+        <a href="#como-funciona">Como funciona</a>
+        <a href="#galeria">Antes e depois</a>
+        <a href="#depoimentos">Depoimentos</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- ============ HERO ============ -->
+  <section class="hero" id="topo">
+    <div class="container hero-grid">
+      <div class="hero-visual reveal">
+        <div class="hero-seal-outer">
+          <div class="hero-seal-ring">
+            <img src="assets/selo-marca.png" alt="Selo Moreira Higienizações">
+          </div>
+        </div>
+      </div>
+
+      <div class="hero-copy">
+        <p class="eyebrow reveal">Higienização profissional · Região metropolitana</p>
+        <h1 class="reveal">Seu estofado parece <em>novo</em> de novo</h1>
+        <p class="lead reveal">Sofás, colchões, poltronas e tapetes higienizados com técnica profissional. Eliminamos manchas, ácaros e odores — e você acompanha tudo pelo WhatsApp.</p>
+
+        <div class="hero-ctas reveal">
+          <a href="#" class="btn-primary" id="btnHeroWhats" target="_blank" rel="noopener">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91C21.95 6.45 17.5 2 12.04 2z"/></svg>
+            Pedir orçamento grátis
+          </a>
+          <a href="#servicos" class="btn-outline">Ver serviços</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SERVIÇOS ============ -->
+  <section class="section" id="servicos">
+    <div class="container">
+      <div class="section-head reveal">
+        <p class="eyebrow">O que fazemos</p>
+        <h2>Cuidado especializado para cada tipo de estofado</h2>
+        <p>Cada material pede uma técnica diferente — usamos o produto e o processo certos para cada peça.</p>
+      </div>
+
+      <div class="services-grid">
+        <div class="service-card reveal">
+          <div class="service-icon-wrap"><svg viewBox="0 0 24 24" fill="none" stroke="#0B2545" stroke-width="1.6"><path d="M3 12h18M5 12v6h14v-6M7 12V8a2 2 0 012-2h6a2 2 0 012 2v4"/></svg></div>
+          <h3>Sofás</h3>
+          <p>Remoção de manchas, ácaros e odores em tecido, suede e couro sintético.</p>
+          <span class="service-cta">Saiba mais →</span>
+        </div>
+        <div class="service-card reveal">
+          <div class="service-icon-wrap"><svg viewBox="0 0 24 24" fill="none" stroke="#0B2545" stroke-width="1.6"><rect x="3" y="8" width="18" height="10" rx="2"/><path d="M3 12h18"/></svg></div>
+          <h3>Colchões</h3>
+          <p>Higienização profunda contra ácaros, fungos e ácaros — sem molhar o núcleo.</p>
+          <span class="service-cta">Saiba mais →</span>
+        </div>
+        <div class="service-card reveal">
+          <div class="service-icon-wrap"><svg viewBox="0 0 24 24" fill="none" stroke="#0B2545" stroke-width="1.6"><path d="M6 20v-6a4 4 0 014-4h4a4 4 0 014 4v6M4 20h16"/></svg></div>
+          <h3>Poltronas</h3>
+          <p>Tratamento delicado que preserva o tecido e devolve o aspecto original.</p>
+          <span class="service-cta">Saiba mais →</span>
+        </div>
+        <div class="service-card reveal">
+          <div class="service-icon-wrap"><svg viewBox="0 0 24 24" fill="none" stroke="#0B2545" stroke-width="1.6"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 9h18"/></svg></div>
+          <h3>Tapetes</h3>
+          <p>Limpeza profunda para tapetes de todos os tamanhos e tipos de fibra.</p>
+          <span class="service-cta">Saiba mais →</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SIMULADOR DE ORÇAMENTO ============ -->
+  <section class="section" id="simulador">
+    <div class="container">
+      <div class="section-head reveal">
+        <p class="eyebrow">Orçamento rápido</p>
+        <h2>Peça seu orçamento em segundos</h2>
+        <p>Escolha o item e fale com a gente pelo WhatsApp. O valor é sempre combinado direto na conversa.</p>
+      </div>
+
+      <div class="simulador-box reveal">
+        <div class="simulador-field">
+          <label for="simItem">O que você quer higienizar?</label>
+          <select id="simItem">
+            <option value="sofa">Sofá</option>
+            <option value="colchao">Colchão</option>
+            <option value="poltrona">Poltrona</option>
+            <option value="tapete">Tapete</option>
+          </select>
+        </div>
+
+        <div class="simulador-field" id="simLugaresField">
+          <label for="simLugares">Quantos lugares?</label>
+          <select id="simLugares">
+            <option value="2">2 lugares</option>
+            <option value="3">3 lugares</option>
+            <option value="4">4 lugares</option>
+            <option value="5">5 lugares</option>
+          </select>
+        </div>
+
+        <div class="simulador-field" id="simQtdField" style="display:none;">
+          <label for="simQtd">Quantas unidades?</label>
+          <input type="number" id="simQtd" min="1" value="1">
+        </div>
+
+        <a href="#" class="btn-primary" id="waSimBtn" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91C21.95 6.45 17.5 2 12.04 2z"/></svg>
+          Pedir orçamento no WhatsApp
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ COMO FUNCIONA ============ -->
+  <section class="section section-dark" id="como-funciona">
+    <div class="container">
+      <div class="section-head reveal">
+        <p class="eyebrow">Processo</p>
+        <h2>Do orçamento ao estofado limpo</h2>
+      </div>
+      <div class="process-grid">
+        <div class="process-step reveal">
+          <div class="process-num">01</div>
+          <h4>Chamada no WhatsApp</h4>
+          <p>Você manda uma foto e recebe o orçamento na hora.</p>
+        </div>
+        <div class="process-step reveal">
+          <div class="process-num">02</div>
+          <h4>Agendamento</h4>
+          <p>Combinamos o melhor dia e horário para você.</p>
+        </div>
+        <div class="process-step reveal">
+          <div class="process-num">03</div>
+          <h4>Higienização no local</h4>
+          <p>Levamos todo o equipamento até sua casa.</p>
+        </div>
+        <div class="process-step reveal">
+          <div class="process-num">04</div>
+          <h4>Estofado como novo</h4>
+          <p>Você confere o resultado antes de finalizarmos.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ GALERIA ============ -->
+  <section class="section" id="galeria">
+    <div class="container">
+      <div class="section-head reveal">
+        <p class="eyebrow">Resultados reais</p>
+        <h2>Antes e depois</h2>
+        <p>Fotos reais de trabalhos feitos pela Moreira Higienizações.</p>
+      </div>
+      <div class="gallery-grid" id="galleryGrid">
+        <div class="gallery-item tall reveal"><div class="gallery-placeholder"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.4"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5-11 11"/></svg><span>Em breve</span></div></div>
+        <div class="gallery-item reveal"><div class="gallery-placeholder"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.4"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5-11 11"/></svg><span>Em breve</span></div></div>
+        <div class="gallery-item reveal"><div class="gallery-placeholder"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.4"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5-11 11"/></svg><span>Em breve</span></div></div>
+        <div class="gallery-item reveal"><div class="gallery-placeholder"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.4"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5-11 11"/></svg><span>Em breve</span></div></div>
+        <div class="gallery-item reveal"><div class="gallery-placeholder"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.4"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5-11 11"/></svg><span>Em breve</span></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ INSTAGRAM ============ -->
+  <div class="instagram-strip">
+    <div class="container instagram-inner">
+      <svg viewBox="0 0 24 24" width="24" height="24"><path d="M12 2c2.72 0 3.06.01 4.12.06 1.06.05 1.79.22 2.43.47.66.26 1.22.6 1.77 1.16.55.55.9 1.11 1.16 1.77.25.64.42 1.37.47 2.43.05 1.06.06 1.4.06 4.12s-.01 3.06-.06 4.12c-.05 1.06-.22 1.79-.47 2.43-.26.66-.61 1.22-1.16 1.77-.55.55-1.11.9-1.77 1.16-.64.25-1.37.42-2.43.47-1.06.05-1.4.06-4.12.06s-3.06-.01-4.12-.06c-1.06-.05-1.79-.22-2.43-.47-.66-.26-1.22-.61-1.77-1.16-.55-.55-.9-1.11-1.16-1.77-.25-.64-.42-1.37-.47-2.43C2.01 15.06 2 14.72 2 12s.01-3.06.06-4.12c.05-1.06.22-1.79.47-2.43.26-.66.61-1.22 1.16-1.77.55-.55 1.11-.9 1.77-1.16.64-.25 1.37-.42 2.43-.47C8.94 2.01 9.28 2 12 2zm0 5a5 5 0 100 10 5 5 0 000-10zm0 8.2a3.2 3.2 0 110-6.4 3.2 3.2 0 010 6.4zm5.2-8.4a1.2 1.2 0 100-2.4 1.2 1.2 0 000 2.4z"/></svg>
+      <p>Acompanhe nosso trabalho em tempo real</p>
+      <a href="https://www.instagram.com/moreira_higienizacoes1_/" target="_blank" rel="noopener">@moreira_higienizações1</a>
+    </div>
+  </div>
+
+  <!-- ============ DEPOIMENTOS ============ -->
+  <section class="section" id="depoimentos">
+    <div class="container">
+      <div class="section-head reveal">
+        <p class="eyebrow">Quem já usou</p>
+        <h2>O que os clientes dizem</h2>
+      </div>
+      <div class="testimonials-grid">
+        <div class="testimonial-card reveal">
+          <div class="stars">★★★★★</div>
+          <p class="quote">Meu sofá voltou a cheirar bem e as manchas antigas sumiram. Atendimento rápido pelo WhatsApp.</p>
+          <div class="testimonial-author">
+            <div class="author-initial">C</div>
+            <div><div class="author-name">Cliente Moreira</div><div class="author-loc">Fortaleza, CE</div></div>
+          </div>
+        </div>
+        <div class="testimonial-card reveal">
+          <div class="stars">★★★★★</div>
+          <p class="quote">Serviço pontual e caprichoso. O colchão ficou muito mais leve e sem o cheiro de mofo.</p>
+          <div class="testimonial-author">
+            <div class="author-initial">C</div>
+            <div><div class="author-name">Cliente Moreira</div><div class="author-loc">Região Metropolitana</div></div>
+          </div>
+        </div>
+        <div class="testimonial-card reveal">
+          <div class="stars">★★★★★</div>
+          <p class="quote">Contratei para o tapete da sala e o resultado superou a expectativa. Recomendo.</p>
+          <div class="testimonial-author">
+            <div class="author-initial">C</div>
+            <div><div class="author-name">Cliente Moreira</div><div class="author-loc">Fortaleza, CE</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ CTA FINAL ============ -->
+  <section class="section">
+    <div class="container">
+      <div class="cta-block reveal">
+        <h2>Pronto para renovar seu estofado?</h2>
+        <p>Mande uma foto agora e receba o orçamento em minutos.</p>
+        <div class="cta-buttons">
+          <a href="#" class="btn-gold" id="btnCtaWhats" target="_blank" rel="noopener">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91C21.95 6.45 17.5 2 12.04 2z"/></svg>
+            Chamar no WhatsApp
+          </a>
+          <a href="#servicos" class="btn-ghost">Ver todos os serviços</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ FOOTER ============ -->
+  <footer>
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <div class="footer-brand-img"><img src="assets/selo-marca.png" alt="Moreira Higienizações"></div>
+          <div>
+            <h4>Moreira Higienizações</h4>
+            <p>Higienização profissional de estofados em Fortaleza e região metropolitana.</p>
+          </div>
+        </div>
+        <div class="footer-col">
+          <h5>Navegação</h5>
+          <a href="#servicos">Serviços</a>
+          <a href="#como-funciona">Como funciona</a>
+          <a href="#galeria">Antes e depois</a>
+          <a href="#depoimentos">Depoimentos</a>
+        </div>
+        <div class="footer-col">
+          <h5>Contato</h5>
+          <a href="#" id="footerWhats" target="_blank" rel="noopener">WhatsApp</a>
+          <a href="https://www.instagram.com/moreira_higienizacoes1_/" target="_blank" rel="noopener">Instagram</a>
+          <a href="admin/login.html">Painel Admin</a>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>© <span id="anoAtual"></span> Moreira Higienizações. Todos os direitos reservados.</span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ============ WHATSAPP FLOAT ============ -->
+  <a href="#" class="whatsapp-float" id="floatWhats" target="_blank" rel="noopener" aria-label="Falar no WhatsApp">
+    <svg viewBox="0 0 24 24"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91C21.95 6.45 17.5 2 12.04 2zm5.8 14.1c-.24.68-1.4 1.3-1.94 1.38-.5.08-1.12.11-1.8-.11-.42-.13-.95-.31-1.64-.6-2.88-1.24-4.76-4.15-4.9-4.34-.14-.19-1.17-1.56-1.17-2.98s.73-2.11 1-2.4c.26-.29.56-.36.75-.36h.55c.18 0 .42-.02.64.5.24.56.8 1.95.87 2.09.07.14.11.31.02.5-.1.19-.14.31-.28.48-.14.17-.29.37-.42.5-.14.14-.28.29-.12.57.16.28.71 1.17 1.53 1.9 1.05.94 1.94 1.23 2.22 1.37.28.14.44.12.6-.07.17-.19.71-.83.9-1.11.19-.28.38-.24.63-.14.26.1 1.63.77 1.91.91.28.14.47.21.54.33.07.12.07.68-.17 1.36z"/></svg>
+  </a>
+
+  <!-- Scripts do projeto original, na ordem certa -->
+  <script src="config.js"></script>
+  <script src="supabase-loader.js"></script>
+  <script src="script.js"></script>
+
+  <script>
+    // ================================================================
+    // Lógica exclusiva desta versão do layout (simulador, menu mobile,
+    // sombra do header). WhatsApp, reveal e galeria já ficam por conta
+    // do script.js do projeto — não duplicamos aqui.
+    // ================================================================
+
+    // Ano no footer
+    document.getElementById('anoAtual').textContent = new Date().getFullYear();
+
+    // Header com sombra ao rolar
+    const header = document.getElementById('siteHeader');
+    window.addEventListener('scroll', () => {
+      header.classList.toggle('scrolled', window.scrollY > 10);
+    }, { passive: true });
+
+    // Menu mobile — abre/fecha e trava o scroll do body enquanto aberto
+    const navToggle = document.getElementById('navToggle');
+    const mobileNav = document.getElementById('mobileNav');
+    navToggle.addEventListener('click', () => {
+      const isOpen = mobileNav.classList.toggle('open');
+      navToggle.setAttribute('aria-expanded', isOpen);
+      document.body.style.overflow = isOpen ? 'hidden' : '';
+    });
+    mobileNav.querySelectorAll('a').forEach(a => {
+      a.addEventListener('click', () => {
+        mobileNav.classList.remove('open');
+        navToggle.setAttribute('aria-expanded', 'false');
+        document.body.style.overflow = '';
+      });
+    });
+
+    // ================================================================
+    // Seletor de item — monta mensagem de WhatsApp sem valores fixos
+    // ================================================================
+    const simItem = document.getElementById('simItem');
+    const simLugares = document.getElementById('simLugares');
+    const simQtd = document.getElementById('simQtd');
+    const simLugaresField = document.getElementById('simLugaresField');
+    const simQtdField = document.getElementById('simQtdField');
+    const waSimBtn = document.getElementById('waSimBtn');
+
+    function calcularSimulador() {
+      const item = simItem.value;
+      let descricaoItem = '';
+
+      simLugaresField.style.display = item === 'sofa' ? 'flex' : 'none';
+      simQtdField.style.display = (item === 'poltrona') ? 'flex' : 'none';
+
+      if (item === 'sofa') {
+        const lugares = simLugares.value;
+        descricaoItem = `Sofá ${lugares} lugares`;
+      } else if (item === 'colchao') {
+        descricaoItem = 'Colchão';
+      } else if (item === 'poltrona') {
+        const qtd = Math.max(1, parseInt(simQtd.value) || 1);
+        descricaoItem = `${qtd} poltrona(s)`;
+      } else if (item === 'tapete') {
+        descricaoItem = 'Tapete';
+      }
+
+      const mensagem = `Olá! Quero um orçamento para: ${descricaoItem}.`;
+      waSimBtn.href = montarLinkWhatsApp(mensagem);
+    }
+
+    [simItem, simLugares, simQtd].forEach(el => el.addEventListener('input', calcularSimulador));
+    calcularSimulador();
+  </script>
+</body>
+</html>
