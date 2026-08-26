@@ -95,10 +95,12 @@
         <p>Receita recebida e lucro líquido, mês a mês</p>
       </div>
     </div>
-    <canvas id="graficoFaturamento" height="90"></canvas>
+    <div class="chart-wrap">
+      <canvas id="graficoFaturamento"></canvas>
+    </div>
   </div>
 
-  <div style="display:grid; grid-template-columns: 1.3fr 1fr; gap: 22px; margin-bottom: 22px;">
+  <div class="grid-2col-fin" style="margin-bottom: 22px;">
     <div class="card">
       <div class="card-header">
         <div>
@@ -228,6 +230,7 @@
         data: dados,
         options: {
           responsive: true,
+          maintainAspectRatio: false,
           plugins: { legend: { position: "bottom" } },
           scales: { y: { ticks: { callback: (v) => "R$ " + v } } }
         }
