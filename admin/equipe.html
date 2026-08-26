@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Equipe — Painel Moreira Higienizações</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..900&family=Work+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="admin-styles.css">
+<style>
+  .equipe-form {
+    display: grid;
+    grid-template-columns: 1.5fr 1fr auto;
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+  .equipe-form input {
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid #E4E0D2;
+    font-family: 'Work Sans', sans-serif;
+    font-size: 0.9rem;
+  }
+  .btn-excluir {
+    background: none;
+    border: none;
+    color: var(--vermelho-erro);
+    cursor: pointer;
+    font-size: 1rem;
+  }
+</style>
+</head>
+<body>
+
+<main class="main">
+  <div class="topbar">
+    <div>
+      <h2>Equipe</h2>
+      <p class="subtitle">Cadastre quem trabalha com você para atribuir aos serviços.</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <h3>Novo membro da equipe</h3>
+      </div>
+    </div>
+
+    <form class="equipe-form" id="formEquipe">
+      <input type="text" id="campoNome" placeholder="Nome" required>
+      <input type="text" id="campoTelefone" placeholder="Telefone (opcional)">
+      <button type="submit" class="btn btn-gold">+ Adicionar</button>
+    </form>
+
+    <div id="listaEquipe">
+      <div class="empty-state"><div class="empty-icon">👥</div><p>Carregando...</p></div>
+    </div>
+  </div>
+</main>
+
+<script src="../supabase-loader.js"></script>
+<script src="../config.js"></script>
+<script src="admin-data.js"></script>
+<script src="admin-sidebar.js"></script>
+<script>
+  protegerPagina();
+  montarSidebar("equipe");
+
+  async function carregarEquipe() {
+    const container = document.getElementById("listaEquipe");
+    try {
+      const equipe = await listarEquipe();
+      if (equipe.length === 0) {
+        container.innerHTML = `<div class="empty-state"><div class="empty-icon">👥</div><p>Nenhum membro cadastrado ainda.</p></div>`;
+        return;
+      }
+
+      container.innerHTML = `
+        <table>
+          <thead><tr><th>Nome</th><th>Telefone</th><th>Status</th><th></th></tr></thead>
+          <tbody>
+            ${equipe.map((m) => `
+              <tr>
+                <td>${m.nome}</td>
+                <td>${m.telefone || "—"}</td>
+                <td>
+                  <select class="select-ativo" data-id="${m.id}" style="border:1.5px solid #DDE3ED; border-radius:8px; padding:6px 10px; font-size:0.8rem; background:var(--creme-claro);">
+                    <option value="true" ${m.ativo ? "selected" : ""}>Ativo</option>
+                    <option value="false" ${!m.ativo ? "selected" : ""}>Inativo</option>
+                  </select>
+                </td>
+                <td><button class="btn-excluir" data-id="${m.id}" title="Excluir">✕</button></td>
+              </tr>`).join("")}
+          </tbody>
+        </table>`;
+
+      container.querySelectorAll(".select-ativo").forEach((select) => {
+        select.addEventListener("change", async (e) => {
+          try {
+            await atualizarMembroEquipe(e.target.dataset.id, { ativo: e.target.value === "true" });
+            mostrarToast("Status atualizado.", "success");
+          } catch (err) {
+            mostrarToast("Erro ao atualizar.", "error");
+          }
+        });
+      });
+
+      container.querySelectorAll(".btn-excluir").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          if (!confirm("Excluir este membro da equipe?")) return;
+          try {
+            await excluirMembroEquipe(btn.dataset.id);
+            mostrarToast("Membro excluído.", "success");
+            carregarEquipe();
+          } catch (err) {
+            mostrarToast("Erro ao excluir.", "error");
+          }
+        });
+      });
+    } catch (err) {
+      console.error(err);
+      container.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><p>Não foi possível carregar.</p></div>`;
+    }
+  }
+
+  document.getElementById("formEquipe").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const nome = document.getElementById("campoNome").value.trim();
+    const telefone = document.getElementById("campoTelefone").value.trim();
+    if (!nome) return;
+
+    try {
+      await criarMembroEquipe({ nome, telefone: telefone || null });
+      mostrarToast("Membro adicionado.", "success");
+      document.getElementById("formEquipe").reset();
+      carregarEquipe();
+    } catch (err) {
+      console.error(err);
+      mostrarToast("Erro ao adicionar membro.", "error");
+    }
+  });
+
+  carregarEquipe();
+</script>
+</body>
+</html>
