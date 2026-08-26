@@ -57,7 +57,7 @@
       });
 
       container.innerHTML = `
-        <table>
+        <div class="table-scroll"><table>
           <thead>
             <tr><th>Cliente</th><th>Telefone</th><th>Serviços feitos</th><th>Total gasto</th><th>Última visita</th><th></th></tr>
           </thead>
@@ -77,7 +77,7 @@
                 </tr>`;
             }).join("")}
           </tbody>
-        </table>`;
+        </table></div>`;
     } catch (err) {
       console.error(err);
       container.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><p>Não foi possível carregar. Verifique a conexão com o Supabase.</p></div>`;
