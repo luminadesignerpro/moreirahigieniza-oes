@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rota do dia — Painel Moreira Higienizações</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..900&family=Work+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="admin-styles.css">
+<style>
+  .data-seletor {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: var(--branco);
+    padding: 8px 16px;
+    border-radius: 100px;
+    box-shadow: 0 2px 10px rgba(11,37,69,0.06);
+  }
+  .data-seletor button {
+    background: var(--creme-claro);
+    border: none;
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    color: var(--azul-marinho);
+    font-weight: 700;
+  }
+  .data-seletor button:hover { background: #e8e4d8; }
+  .data-seletor input[type="date"] {
+    border: none;
+    background: transparent;
+    font-weight: 600;
+    color: var(--azul-marinho);
+    font-family: 'Work Sans', sans-serif;
+    font-size: 0.9rem;
+  }
+
+  .parada {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+    padding: 16px 0;
+    border-bottom: 1px solid #ECEAE0;
+  }
+  .parada:last-child { border-bottom: none; }
+  .parada-hora {
+    min-width: 64px;
+    font-weight: 700;
+    color: var(--azul-marinho);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.95rem;
+    padding-top: 2px;
+  }
+  .parada-corpo { flex: 1; }
+  .parada-cliente { font-weight: 600; color: var(--azul-marinho); margin-bottom: 4px; }
+  .parada-endereco { color: #6b7688; font-size: 0.85rem; margin-bottom: 8px; }
+  .parada-tags { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .parada-acoes { display: flex; gap: 8px; }
+  .btn-maps {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--azul-marinho);
+    color: white;
+    border-radius: 100px;
+    padding: 8px 14px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .btn-maps:hover { opacity: 0.9; }
+  .btn-maps.disabled {
+    background: #C9C4B4;
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+
+<main class="main">
+  <div class="topbar">
+    <div>
+      <h2>Rota do dia</h2>
+      <p class="subtitle">Serviços agendados, em ordem de horário.</p>
+    </div>
+    <div class="data-seletor">
+      <button id="btnDiaAnterior">‹</button>
+      <input type="date" id="dataSelecionada">
+      <button id="btnDiaProximo">›</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <h3 id="tituloRota">Rota de hoje</h3>
+        <p id="subtituloRota">—</p>
+      </div>
+    </div>
+    <div id="listaRota">
+      <div class="empty-state"><div class="empty-icon">🗺️</div><p>Carregando...</p></div>
+    </div>
+  </div>
+</main>
+
+<script src="../supabase-loader.js"></script>
+<script src="../config.js"></script>
+<script src="admin-data.js"></script>
+<script src="admin-sidebar.js"></script>
+<script>
+  protegerPagina();
+  montarSidebar("rota");
+
+  const ICONES_SERVICO = { sofa: "🛋️", colchao: "🛏️", poltrona: "🪑", tapete: "🧶" };
+  const NOMES_SERVICO = { sofa: "Sofá", colchao: "Colchão", poltrona: "Poltrona", tapete: "Tapete" };
+  const NOMES_STATUS = { agendado: "Agendado", andamento: "Em andamento", concluido: "Concluído" };
+
+  const inputData = document.getElementById("dataSelecionada");
+  inputData.value = new Date().toISOString().slice(0, 10);
+
+  document.getElementById("btnDiaAnterior").addEventListener("click", () => {
+    const d = new Date(inputData.value + "T12:00:00");
+    d.setDate(d.getDate() - 1);
+    inputData.value = d.toISOString().slice(0, 10);
+    carregarRota();
+  });
+
+  document.getElementById("btnDiaProximo").addEventListener("click", () => {
+    const d = new Date(inputData.value + "T12:00:00");
+    d.setDate(d.getDate() + 1);
+    inputData.value = d.toISOString().slice(0, 10);
+    carregarRota();
+  });
+
+  inputData.addEventListener("change", carregarRota);
+
+  async function carregarRota() {
+    const container = document.getElementById("listaRota");
+    const dataISO = inputData.value;
+    const hojeISO = new Date().toISOString().slice(0, 10);
+
+    document.getElementById("tituloRota").textContent =
+      dataISO === hojeISO ? "Rota de hoje" : `Rota de ${formatarData(dataISO)}`;
+
+    try {
+      const paradas = await listarAgendamentosDoDia(dataISO);
+
+      document.getElementById("subtituloRota").textContent =
+        paradas.length === 0 ? "Nenhum serviço nesta data" : `${paradas.length} serviço(s) — ordenados por horário`;
+
+      if (paradas.length === 0) {
+        container.innerHTML = `<div class="empty-state"><div class="empty-icon">🗺️</div><p>Nenhum serviço agendado para esta data.</p></div>`;
+        return;
+      }
+
+      container.innerHTML = paradas.map((p) => {
+        const endereco = p.clientes?.endereco;
+        const linkMaps = gerarLinkGoogleMaps(endereco);
+        return `
+          <div class="parada">
+            <div class="parada-hora">${formatarHorario(p.horario)}</div>
+            <div class="parada-corpo">
+              <div class="parada-cliente">${ICONES_SERVICO[p.tipo_servico] || ""} ${p.clientes?.nome || "Cliente"} — ${NOMES_SERVICO[p.tipo_servico] || p.tipo_servico}</div>
+              <div class="parada-endereco">${endereco || "Endereço não cadastrado"}${p.clientes?.telefone ? " · " + p.clientes.telefone : ""}</div>
+              <div class="parada-tags">
+                <span class="badge">${NOMES_STATUS[p.status] || p.status}</span>
+                ${p.equipe?.nome ? `<span class="badge">👤 ${p.equipe.nome}</span>` : `<span class="badge">👤 Não atribuído</span>`}
+              </div>
+            </div>
+            <div class="parada-acoes">
+              ${linkMaps
+                ? `<a class="btn-maps" href="${linkMaps}" target="_blank" rel="noopener">📍 Abrir no Maps</a>`
+                : `<span class="btn-maps disabled">📍 Sem endereço</span>`}
+            </div>
+          </div>`;
+      }).join("");
+    } catch (err) {
+      console.error(err);
+      container.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><p>Não foi possível carregar. Verifique a conexão com o Supabase.</p></div>`;
+    }
+  }
+
+  carregarRota();
+</script>
+</body>
+</html>
