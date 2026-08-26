@@ -50,8 +50,8 @@
         <input type="text" id="campoTelefoneCliente" required placeholder="(85) 9 9999-9999">
       </div>
       <div class="field">
-        <label>Endereço completo</label>
-        <input type="text" id="campoEndereco" placeholder="Rua, número, bairro, cidade">
+        <label>Endereço (pra rota do dia / mapa)</label>
+        <input type="text" id="campoEndereco" placeholder="Rua, número, bairro">
       </div>
       <div class="field-row">
         <div class="field">
@@ -74,9 +74,14 @@
           <input type="time" id="campoHorario">
         </div>
         <div class="field">
-          <label>Quem vai atender</label>
-          <select id="campoEquipe">
-            <option value="">— Não definido —</option>
+          <label>Repete a cada quantos meses?</label>
+          <select id="campoRecorrencia">
+            <option value="">Não repete</option>
+            <option value="1">Todo mês</option>
+            <option value="2">A cada 2 meses</option>
+            <option value="3">A cada 3 meses</option>
+            <option value="6">A cada 6 meses</option>
+            <option value="12">1 vez por ano</option>
           </select>
         </div>
       </div>
@@ -120,8 +125,23 @@
   </div>
 </div>
 
+<!-- MODAL PIX -->
+<div class="modal-overlay" id="modalPix">
+  <div class="modal-box" style="max-width:340px; text-align:center;">
+    <h3>Cobrar via Pix</h3>
+    <p style="color:#66738a; font-size:0.85rem; margin-bottom:14px;" id="pixDescricao"></p>
+    <div id="pixQrCode" style="display:flex; justify-content:center; margin-bottom:14px;"></div>
+    <textarea id="pixCopiaECola" readonly rows="3" style="width:100%; font-family:'JetBrains Mono',monospace; font-size:0.7rem; padding:8px; border-radius:8px; border:1.5px solid #DDE3ED; resize:none;"></textarea>
+    <button type="button" class="btn btn-primary" id="btnCopiarPix" style="width:100%; margin-top:10px;">Copiar código Pix</button>
+    <button type="button" class="btn btn-outline" id="btnFecharPix" style="width:100%; margin-top:8px;">Fechar</button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="../supabase-loader.js"></script>
 <script src="../config.js"></script>
+<script src="pix-utils.js"></script>
 <script src="admin-data.js"></script>
 <script src="admin-sidebar.js"></script>
 <script>
@@ -132,19 +152,7 @@
   const NOMES_SERVICO = { sofa: "Sofá", colchao: "Colchão", poltrona: "Poltrona", tapete: "Tapete" };
 
   let agendamentosCache = [];
-  let equipeCache = [];
   let filtroAtual = "todos";
-
-  async function carregarEquipeSelect() {
-    try {
-      equipeCache = await listarEquipe({ apenasAtivos: true });
-      const select = document.getElementById("campoEquipe");
-      select.innerHTML = `<option value="">— Não definido —</option>` +
-        equipeCache.map((m) => `<option value="${m.id}">${m.nome}</option>`).join("");
-    } catch (err) {
-      console.error(err);
-    }
-  }
 
   async function carregarAgendamentos() {
     const container = document.getElementById("tabelaAgendamentos");
@@ -169,10 +177,10 @@
     }
 
     container.innerHTML = `
-      <table>
+      <div class="table-scroll"><table>
         <thead>
           <tr>
-            <th>Cliente</th><th>Serviço</th><th>Data</th><th>Equipe</th><th>Valor</th><th>Pagamento</th><th>Status</th><th></th>
+            <th>Cliente</th><th>Serviço</th><th>Data</th><th>Valor</th><th>Pagamento</th><th>Status</th><th>Confirmação</th><th></th>
           </tr>
         </thead>
         <tbody>
@@ -183,8 +191,7 @@
                 <span style="color:#8b97ab; font-size:0.78rem;">${a.clientes?.telefone || ""}</span>
               </td>
               <td>${ICONES_SERVICO[a.tipo_servico] || ""} ${NOMES_SERVICO[a.tipo_servico] || a.tipo_servico}</td>
-              <td>${formatarData(a.data_servico)}${a.horario ? " · " + formatarHorario(a.horario) : ""}</td>
-              <td>${a.equipe?.nome || "—"}</td>
+              <td>${formatarData(a.data_servico)}</td>
               <td>${formatarMoeda(a.valor_cobrado)}</td>
               <td><span class="badge badge-${a.status_pagamento === 'pago' ? 'pago' : 'pendente'}">${a.status_pagamento}</span></td>
               <td>
@@ -196,13 +203,21 @@
                 </select>
               </td>
               <td>
+                ${a.confirmado === 'confirmado' ? '<span class="badge badge-pago">✓ Confirmado</span>' : ''}
+                ${a.confirmado === 'remarcar' ? '<span class="badge" style="background:#F6DDD5; color:#C8553D;">↻ Remarcar</span>' : ''}
+                ${(!a.confirmado || a.confirmado === 'pendente') ? '<span class="badge badge-pendente">A confirmar</span>' : ''}
+              </td>
+              <td>
                 <button class="btn-icon btn-editar" data-id="${a.id}" title="Editar">✏️</button>
+                <button class="btn-icon btn-pix" data-id="${a.id}" title="Gerar Pix">📱</button>
+                <button class="btn-icon btn-recibo" data-id="${a.id}" title="Gerar recibo PDF">📄</button>
+                ${a.status === 'concluido' ? `<button class="btn-icon btn-avaliacao" data-id="${a.id}" title="Pedir avaliação">⭐</button>` : ""}
                 <button class="btn-icon danger btn-excluir" data-id="${a.id}" title="Excluir">🗑️</button>
               </td>
             </tr>
           `).join("")}
         </tbody>
-      </table>`;
+      </table></div>`;
 
     document.querySelectorAll(".select-status").forEach((select) => {
       select.addEventListener("change", async (e) => {
@@ -219,6 +234,18 @@
 
     document.querySelectorAll(".btn-editar").forEach((btn) => {
       btn.addEventListener("click", () => abrirModalEdicao(btn.dataset.id));
+    });
+
+    document.querySelectorAll(".btn-pix").forEach((btn) => {
+      btn.addEventListener("click", () => abrirModalPix(btn.dataset.id));
+    });
+
+    document.querySelectorAll(".btn-recibo").forEach((btn) => {
+      btn.addEventListener("click", () => gerarReciboPDF(btn.dataset.id));
+    });
+
+    document.querySelectorAll(".btn-avaliacao").forEach((btn) => {
+      btn.addEventListener("click", () => pedirAvaliacao(btn.dataset.id));
     });
 
     document.querySelectorAll(".btn-excluir").forEach((btn) => {
@@ -248,23 +275,20 @@
   const modal = document.getElementById("modalAgendamento");
   const form = document.getElementById("formAgendamento");
 
-  document.getElementById("btnNovoAgendamento").addEventListener("click", async () => {
+  document.getElementById("btnNovoAgendamento").addEventListener("click", () => {
     document.getElementById("modalTitulo").textContent = "Novo agendamento";
     form.reset();
     document.getElementById("agendamentoId").value = "";
     document.getElementById("campoDataServico").value = new Date().toISOString().slice(0, 10);
-    await carregarEquipeSelect();
     modal.classList.add("open");
   });
 
   document.getElementById("btnCancelarModal").addEventListener("click", () => modal.classList.remove("open"));
   modal.addEventListener("click", (e) => { if (e.target === modal) modal.classList.remove("open"); });
 
-  async function abrirModalEdicao(id) {
+  function abrirModalEdicao(id) {
     const ag = agendamentosCache.find((a) => String(a.id) === String(id));
     if (!ag) return;
-
-    await carregarEquipeSelect();
 
     document.getElementById("modalTitulo").textContent = "Editar agendamento";
     document.getElementById("agendamentoId").value = ag.id;
@@ -273,8 +297,8 @@
     document.getElementById("campoEndereco").value = ag.clientes?.endereco || "";
     document.getElementById("campoTipoServico").value = ag.tipo_servico;
     document.getElementById("campoDataServico").value = (ag.data_servico || "").slice(0, 10);
-    document.getElementById("campoHorario").value = ag.horario ? ag.horario.slice(0, 5) : "";
-    document.getElementById("campoEquipe").value = ag.equipe_id || "";
+    document.getElementById("campoHorario").value = (ag.horario || "").slice(0, 5);
+    document.getElementById("campoRecorrencia").value = ag.recorrencia_meses || "";
     document.getElementById("campoValor").value = ag.valor_cobrado;
     document.getElementById("campoCusto").value = ag.custo_produto || 0;
     document.getElementById("campoFormaPagamento").value = ag.forma_pagamento || "pix";
@@ -292,7 +316,7 @@
         nome: document.getElementById("campoNomeCliente").value.trim(),
         telefone: document.getElementById("campoTelefoneCliente").value.trim(),
         bairro: null,
-        endereco: document.getElementById("campoEndereco").value.trim() || null
+        endereco: document.getElementById("campoEndereco").value.trim()
       });
 
       const payload = {
@@ -300,7 +324,8 @@
         tipo_servico: document.getElementById("campoTipoServico").value,
         data_servico: document.getElementById("campoDataServico").value,
         horario: document.getElementById("campoHorario").value || null,
-        equipe_id: document.getElementById("campoEquipe").value || null,
+        recorrencia_meses: document.getElementById("campoRecorrencia").value
+          ? parseInt(document.getElementById("campoRecorrencia").value) : null,
         valor_cobrado: parseFloat(document.getElementById("campoValor").value) || 0,
         custo_produto: parseFloat(document.getElementById("campoCusto").value) || 0,
         forma_pagamento: document.getElementById("campoFormaPagamento").value,
@@ -326,6 +351,123 @@
   });
 
   carregarAgendamentos();
+
+  // ----- PIX -----
+  const modalPix = document.getElementById("modalPix");
+  document.getElementById("btnFecharPix").addEventListener("click", () => modalPix.classList.remove("open"));
+  modalPix.addEventListener("click", (e) => { if (e.target === modalPix) modalPix.classList.remove("open"); });
+
+  function abrirModalPix(id) {
+    const ag = agendamentosCache.find((a) => String(a.id) === String(id));
+    if (!ag) return;
+
+    if (!CONFIG.pixChave || CONFIG.pixChave === "SUA-CHAVE-PIX-AQUI") {
+      mostrarToast("Configure sua chave Pix real em config.js antes de usar.", "error");
+      return;
+    }
+
+    const codigo = gerarPixCopiaECola({
+      chave: CONFIG.pixChave,
+      nomeRecebedor: CONFIG.pixNomeRecebedor,
+      cidade: CONFIG.pixCidade,
+      valor: ag.valor_cobrado,
+      identificador: ag.id.replace(/-/g, "").slice(0, 25)
+    });
+
+    document.getElementById("pixDescricao").textContent =
+      `${ag.clientes?.nome || "Cliente"} — ${formatarMoeda(ag.valor_cobrado)}`;
+    document.getElementById("pixCopiaECola").value = codigo;
+
+    const qrContainer = document.getElementById("pixQrCode");
+    qrContainer.innerHTML = "";
+    new QRCode(qrContainer, { text: codigo, width: 200, height: 200 });
+
+    modalPix.classList.add("open");
+  }
+
+  document.getElementById("btnCopiarPix").addEventListener("click", () => {
+    const campo = document.getElementById("pixCopiaECola");
+    campo.select();
+    navigator.clipboard.writeText(campo.value).then(() => {
+      mostrarToast("Código Pix copiado!", "success");
+    }).catch(() => {
+      document.execCommand("copy");
+      mostrarToast("Código Pix copiado!", "success");
+    });
+  });
+
+  // ----- RECIBO PDF -----
+  function gerarReciboPDF(id) {
+    const ag = agendamentosCache.find((a) => String(a.id) === String(id));
+    if (!ag) return;
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(16);
+    doc.text("Moreira Higienizações", 20, 22);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text("Higienização profissional de estofados", 20, 29);
+    doc.line(20, 34, 190, 34);
+
+    doc.setFontSize(13);
+    doc.setFont("helvetica", "bold");
+    doc.text("Recibo de Serviço", 20, 45);
+
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "normal");
+    const linhas = [
+      ["Cliente:", ag.clientes?.nome || "—"],
+      ["Telefone:", ag.clientes?.telefone || "—"],
+      ["Serviço:", NOMES_SERVICO[ag.tipo_servico] || ag.tipo_servico],
+      ["Data:", formatarData(ag.data_servico)],
+      ["Valor:", formatarMoeda(ag.valor_cobrado)],
+      ["Forma de pagamento:", ag.forma_pagamento || "—"],
+      ["Status do pagamento:", ag.status_pagamento === "pago" ? "Pago" : "Pendente"]
+    ];
+
+    let y = 58;
+    linhas.forEach(([label, valor]) => {
+      doc.setFont("helvetica", "bold");
+      doc.text(label, 20, y);
+      doc.setFont("helvetica", "normal");
+      doc.text(String(valor), 75, y);
+      y += 9;
+    });
+
+    y += 10;
+    doc.line(20, y, 190, y);
+    y += 10;
+    doc.setFontSize(9);
+    doc.setTextColor(120);
+    doc.text("Este documento serve como comprovante do serviço prestado.", 20, y);
+    doc.text(`Emitido em ${new Date().toLocaleDateString("pt-BR")}`, 20, y + 6);
+
+    doc.save(`recibo-${(ag.clientes?.nome || "cliente").replace(/\s+/g, "-").toLowerCase()}-${ag.data_servico}.pdf`);
+  }
+
+  // ----- PEDIR AVALIAÇÃO -----
+  async function pedirAvaliacao(id) {
+    const ag = agendamentosCache.find((a) => String(a.id) === String(id));
+    if (!ag || !ag.clientes?.telefone) {
+      mostrarToast("Cliente sem telefone cadastrado.", "error");
+      return;
+    }
+
+    const link = `${window.location.origin}/avaliar.html?agendamento=${ag.id}`;
+    const mensagem = `Olá, ${ag.clientes.nome}! Tudo bem? Ficamos felizes em higienizar seu ${NOMES_SERVICO[ag.tipo_servico].toLowerCase()}. Poderia deixar uma avaliação rápida? ${link}`;
+    const numero = ag.clientes.telefone.replace(/\D/g, "");
+
+    window.open(`https://wa.me/55${numero}?text=${encodeURIComponent(mensagem)}`, "_blank");
+
+    try {
+      await atualizarAgendamento(id, { avaliacao_pedida_em: new Date().toISOString() });
+    } catch (err) {
+      console.error("Não foi possível marcar avaliação como pedida:", err);
+    }
+  }
 </script>
 </body>
 </html>
