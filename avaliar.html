@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Avaliar serviço — Moreira Higienizações</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,700;1,400;1,600&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#0B2545; --cream:#F5F2EA; --gold:#BF8C3A;
+    --text:#1C1C1E; --text-muted:#5A6880; --white:#FFFFFF; --border:rgba(11,37,69,0.08);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: 'Inter', sans-serif; background: var(--cream); color: var(--text);
+    min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px;
+  }
+  .box {
+    background: var(--white); border-radius: 20px; padding: 32px 26px; max-width: 420px; width: 100%;
+    box-shadow: 0 10px 40px rgba(11,37,69,0.08);
+  }
+  h1 { font-family: 'Playfair Display', serif; font-size: 1.5rem; color: var(--navy); margin: 0 0 6px; }
+  p.sub { color: var(--text-muted); font-size: 0.92rem; margin: 0 0 22px; }
+  .estrelas { display: flex; gap: 8px; justify-content: center; margin-bottom: 22px; }
+  .estrelas button {
+    background: none; border: none; font-size: 2.1rem; cursor: pointer; color: #D9D3C4; transition: color 0.15s ease; padding: 0;
+  }
+  .estrelas button.ativa { color: var(--gold); }
+  label { display: block; font-weight: 600; font-size: 0.86rem; color: var(--navy); margin-bottom: 6px; }
+  textarea, input {
+    width: 100%; border: 1.5px solid var(--border); border-radius: 10px; padding: 12px;
+    font-family: inherit; font-size: 0.92rem; margin-bottom: 16px; resize: vertical;
+  }
+  button.enviar {
+    width: 100%; background: var(--navy); color: white; border: none; padding: 14px;
+    border-radius: 10px; font-weight: 600; font-size: 0.95rem; cursor: pointer;
+  }
+  button.enviar:disabled { opacity: 0.6; cursor: not-allowed; }
+  .sucesso { text-align: center; }
+  .sucesso .icone { font-size: 2.6rem; margin-bottom: 10px; }
+  .erro { color: #C8553D; font-size: 0.85rem; margin-top: -8px; margin-bottom: 14px; display: none; }
+</style>
+</head>
+<body>
+
+<div class="box" id="caixa">
+  <h1>Como foi nosso serviço?</h1>
+  <p class="sub">Sua opinião ajuda a gente a melhorar e ajuda outros clientes a nos conhecer.</p>
+
+  <form id="formAvaliacao">
+    <div class="estrelas" id="estrelas">
+      <button type="button" data-nota="1">★</button>
+      <button type="button" data-nota="2">★</button>
+      <button type="button" data-nota="3">★</button>
+      <button type="button" data-nota="4">★</button>
+      <button type="button" data-nota="5">★</button>
+    </div>
+
+    <label for="campoNome">Seu nome</label>
+    <input type="text" id="campoNome" required placeholder="Como quer aparecer no site">
+
+    <label for="campoBairro">Bairro (opcional)</label>
+    <input type="text" id="campoBairro" placeholder="Ex: Aldeota">
+
+    <label for="campoTexto">Conte como foi</label>
+    <textarea id="campoTexto" rows="4" required placeholder="O que achou do serviço?"></textarea>
+
+    <p class="erro" id="mensagemErro"></p>
+    <button type="submit" class="enviar" id="btnEnviar">Enviar avaliação</button>
+  </form>
+
+  <div class="sucesso" id="caixaSucesso" style="display:none;">
+    <div class="icone">✅</div>
+    <h1>Obrigado!</h1>
+    <p class="sub">Sua avaliação foi enviada. Agradecemos muito por confiar na Moreira Higienizações.</p>
+  </div>
+</div>
+
+<script src="supabase-loader.js"></script>
+<script>
+  const params = new URLSearchParams(window.location.search);
+  const agendamentoId = params.get("agendamento") || null;
+
+  let notaSelecionada = 0;
+  const botoesEstrela = document.querySelectorAll("#estrelas button");
+  botoesEstrela.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      notaSelecionada = parseInt(btn.dataset.nota);
+      botoesEstrela.forEach((b) => {
+        b.classList.toggle("ativa", parseInt(b.dataset.nota) <= notaSelecionada);
+      });
+    });
+  });
+
+  document.getElementById("formAvaliacao").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const erroEl = document.getElementById("mensagemErro");
+    erroEl.style.display = "none";
+
+    if (notaSelecionada === 0) {
+      erroEl.textContent = "Escolha de 1 a 5 estrelas antes de enviar.";
+      erroEl.style.display = "block";
+      return;
+    }
+
+    const btn = document.getElementById("btnEnviar");
+    btn.disabled = true;
+    btn.textContent = "Enviando...";
+
+    try {
+      const supabase = await getSupabaseClient();
+      const { error } = await supabase.from("depoimentos").insert([{
+        agendamento_id: agendamentoId,
+        nome_cliente: document.getElementById("campoNome").value.trim(),
+        bairro: document.getElementById("campoBairro").value.trim() || null,
+        nota: notaSelecionada,
+        texto: document.getElementById("campoTexto").value.trim(),
+        aprovado: false
+      }]);
+      if (error) throw error;
+
+      document.getElementById("formAvaliacao").style.display = "none";
+      document.getElementById("caixaSucesso").style.display = "block";
+    } catch (err) {
+      console.error(err);
+      erroEl.textContent = "Não foi possível enviar. Tente novamente em instantes.";
+      erroEl.style.display = "block";
+      btn.disabled = false;
+      btn.textContent = "Enviar avaliação";
+    }
+  });
+</script>
+</body>
+</html>
