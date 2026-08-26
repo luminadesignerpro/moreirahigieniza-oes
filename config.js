@@ -8,6 +8,12 @@ const CONFIG = {
   // Número de WhatsApp no formato internacional (sem espaços, sem +)
   whatsappNumero: "5585989002147",
 
+  // Chave Pix usada para gerar QR Code de cobrança (CPF, CNPJ, telefone, e-mail ou aleatória)
+  // TROQUE pelo valor real antes de usar em produção.
+  pixChave: "SUA-CHAVE-PIX-AQUI",
+  pixNomeRecebedor: "Moreira Higienizacoes",
+  pixCidade: "Fortaleza",
+
   // Mensagem padrão enviada ao clicar nos botões de WhatsApp do site
   mensagemPadrao: "Olá! Vim pelo site e quero pedir um orçamento de higienização 🧼",
 
