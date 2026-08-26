@@ -1,4 +1,4 @@
-  // ============================================
+// ============================================
 // ADMIN — CAMADA DE DADOS (Supabase)
 // Funções compartilhadas entre todas as páginas
 // do painel admin. Tabelas usadas:
@@ -7,6 +7,7 @@
 //   - galeria
 //   - usuarios_admin (login)
 //   - bot_config     (fluxo do WhatsApp Bot + config Evolution API)
+//   - despesas_gerais (gastos do negócio, fora do custo por serviço)
 // ============================================
 
 const STATUS_AGENDAMENTO = {
@@ -22,6 +23,13 @@ const STATUS_PAGAMENTO = {
 };
 
 const FORMAS_PAGAMENTO = ["pix", "dinheiro", "cartao"];
+
+const CATEGORIAS_DESPESA = {
+  gasolina: "Gasolina",
+  manutencao_extratora: "Manutenção da extratora",
+  material_limpeza: "Material de limpeza",
+  outros: "Outros"
+};
 
 // --------------------------------------------
 // CLIENTES
@@ -130,6 +138,8 @@ async function calcularResumoFinanceiro({ mes, ano } = {}) {
     receitaTotal: 0,
     custoTotal: 0,
     lucroLiquido: 0,
+    despesasGerais: 0,
+    lucroLiquidoReal: 0,
     totalServicos: servicos.length,
     pendentes: 0,
     valorPendente: 0,
@@ -158,6 +168,11 @@ async function calcularResumoFinanceiro({ mes, ano } = {}) {
   });
 
   resumo.lucroLiquido = resumo.receitaTotal - resumo.custoTotal;
+
+  const despesasGerais = await somarDespesasGerais({ mes: mesRef, ano: anoRef });
+  resumo.despesasGerais = despesasGerais;
+  resumo.lucroLiquidoReal = resumo.lucroLiquido - despesasGerais;
+
   return resumo;
 }
 
@@ -173,6 +188,82 @@ async function listarServicoMaisPedido() {
     contagem[s.tipo_servico] = (contagem[s.tipo_servico] || 0) + 1;
   });
   return contagem;
+}
+
+// --------------------------------------------
+// DESPESAS GERAIS (fora do custo por serviço)
+// --------------------------------------------
+async function listarDespesasGerais({ mes, ano } = {}) {
+  const supabase = await getSupabaseClient();
+  let query = supabase.from("despesas_gerais").select("*").order("data_despesa", { ascending: false });
+
+  if (mes !== undefined && ano !== undefined) {
+    const inicio = new Date(ano, mes, 1).toISOString().slice(0, 10);
+    const fim = new Date(ano, mes + 1, 1).toISOString().slice(0, 10);
+    query = query.gte("data_despesa", inicio).lt("data_despesa", fim);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return data || [];
+}
+
+async function criarDespesaGeral({ descricao, categoria, valor, data_despesa }) {
+  const supabase = await getSupabaseClient();
+  const { data, error } = await supabase
+    .from("despesas_gerais")
+    .insert([{ descricao, categoria, valor, data_despesa }])
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function excluirDespesaGeral(id) {
+  const supabase = await getSupabaseClient();
+  const { error } = await supabase.from("despesas_gerais").delete().eq("id", id);
+  if (error) throw error;
+}
+
+async function somarDespesasGerais({ mes, ano }) {
+  const despesas = await listarDespesasGerais({ mes, ano });
+  return despesas.reduce((soma, d) => soma + (Number(d.valor) || 0), 0);
+}
+
+// --------------------------------------------
+// FATURAMENTO MENSAL (para o gráfico de tendência)
+// --------------------------------------------
+async function calcularFaturamentoMensal(quantidadeMeses = 12) {
+  const supabase = await getSupabaseClient();
+  const agora = new Date();
+  const inicio = new Date(agora.getFullYear(), agora.getMonth() - (quantidadeMeses - 1), 1)
+    .toISOString().slice(0, 10);
+
+  const { data, error } = await supabase
+    .from("agendamentos")
+    .select("valor_cobrado, custo_produto, status_pagamento, data_servico")
+    .gte("data_servico", inicio);
+  if (error) throw error;
+
+  const meses = [];
+  for (let i = quantidadeMeses - 1; i >= 0; i--) {
+    const d = new Date(agora.getFullYear(), agora.getMonth() - i, 1);
+    meses.push({ ano: d.getFullYear(), mes: d.getMonth(), receita: 0, lucro: 0 });
+  }
+
+  (data || []).forEach((a) => {
+    if (a.status_pagamento !== "pago") return;
+    const d = new Date(a.data_servico);
+    const alvo = meses.find((m) => m.ano === d.getFullYear() && m.mes === d.getMonth());
+    if (alvo) {
+      const valor = Number(a.valor_cobrado) || 0;
+      const custo = Number(a.custo_produto) || 0;
+      alvo.receita += valor;
+      alvo.lucro += valor - custo;
+    }
+  });
+
+  return meses;
 }
 
 // --------------------------------------------
@@ -283,4 +374,4 @@ function mostrarToast(mensagem, tipo = "default") {
   toast.textContent = mensagem;
   container.appendChild(toast);
   setTimeout(() => toast.remove(), 3500);
-} 
+}
