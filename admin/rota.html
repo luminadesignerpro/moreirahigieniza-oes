@@ -8,72 +8,23 @@
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..900&family=Work+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="admin-styles.css">
 <style>
-  .data-seletor {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    background: var(--branco);
-    padding: 8px 16px;
-    border-radius: 100px;
-    box-shadow: 0 2px 10px rgba(11,37,69,0.06);
+  .rota-data-seletor {
+    display: flex; align-items: center; gap: 12px;
+    background: var(--branco); padding: 10px 16px; border-radius: 100px;
+    box-shadow: 0 2px 10px rgba(11,37,69,0.06); width: fit-content; margin-bottom: 22px;
   }
-  .data-seletor button {
-    background: var(--creme-claro);
-    border: none;
-    width: 32px; height: 32px;
-    border-radius: 50%;
-    color: var(--azul-marinho);
-    font-weight: 700;
+  .rota-data-seletor input[type="date"] { border: none; font-family: inherit; font-weight: 600; color: var(--azul-marinho); background: transparent; }
+  .rota-item {
+    display: flex; gap: 16px; padding: 18px; border-radius: 14px;
+    background: var(--branco); box-shadow: 0 2px 10px rgba(11,37,69,0.06);
+    margin-bottom: 14px; align-items: flex-start;
   }
-  .data-seletor button:hover { background: #e8e4d8; }
-  .data-seletor input[type="date"] {
-    border: none;
-    background: transparent;
-    font-weight: 600;
-    color: var(--azul-marinho);
-    font-family: 'Work Sans', sans-serif;
-    font-size: 0.9rem;
-  }
-
-  .parada {
-    display: flex;
-    gap: 16px;
-    align-items: flex-start;
-    padding: 16px 0;
-    border-bottom: 1px solid #ECEAE0;
-  }
-  .parada:last-child { border-bottom: none; }
-  .parada-hora {
-    min-width: 64px;
-    font-weight: 700;
-    color: var(--azul-marinho);
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.95rem;
-    padding-top: 2px;
-  }
-  .parada-corpo { flex: 1; }
-  .parada-cliente { font-weight: 600; color: var(--azul-marinho); margin-bottom: 4px; }
-  .parada-endereco { color: #6b7688; font-size: 0.85rem; margin-bottom: 8px; }
-  .parada-tags { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-  .parada-acoes { display: flex; gap: 8px; }
-  .btn-maps {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    background: var(--azul-marinho);
-    color: white;
-    border-radius: 100px;
-    padding: 8px 14px;
-    font-size: 0.82rem;
-    font-weight: 600;
-    text-decoration: none;
-    white-space: nowrap;
-  }
-  .btn-maps:hover { opacity: 0.9; }
-  .btn-maps.disabled {
-    background: #C9C4B4;
-    pointer-events: none;
-  }
+  .rota-hora { font-family: 'JetBrains Mono', monospace; font-weight: 700; color: var(--azul-marinho); font-size: 1.05rem; min-width: 62px; }
+  .rota-info { flex: 1; }
+  .rota-info .cliente { font-weight: 700; color: var(--azul-marinho); margin-bottom: 2px; }
+  .rota-info .endereco { color: #66738a; font-size: 0.88rem; margin-bottom: 8px; }
+  .rota-info .servico { font-size: 0.84rem; color: var(--azul-marinho); }
+  .rota-acoes { display: flex; flex-direction: column; gap: 8px; }
 </style>
 </head>
 <body>
@@ -82,25 +33,18 @@
   <div class="topbar">
     <div>
       <h2>Rota do dia</h2>
-      <p class="subtitle">Serviços agendados, em ordem de horário.</p>
-    </div>
-    <div class="data-seletor">
-      <button id="btnDiaAnterior">‹</button>
-      <input type="date" id="dataSelecionada">
-      <button id="btnDiaProximo">›</button>
+      <p class="subtitle">Serviços do dia, em ordem, com atalho direto pro mapa.</p>
     </div>
   </div>
 
-  <div class="card">
-    <div class="card-header">
-      <div>
-        <h3 id="tituloRota">Rota de hoje</h3>
-        <p id="subtituloRota">—</p>
-      </div>
-    </div>
-    <div id="listaRota">
-      <div class="empty-state"><div class="empty-icon">🗺️</div><p>Carregando...</p></div>
-    </div>
+  <div class="rota-data-seletor">
+    <button id="btnDiaAnterior" class="btn-icon">‹</button>
+    <input type="date" id="campoDataRota">
+    <button id="btnDiaProximo" class="btn-icon">›</button>
+  </div>
+
+  <div id="listaRota">
+    <div class="empty-state"><div class="empty-icon">🗺️</div><p>Carregando...</p></div>
   </div>
 </main>
 
@@ -114,64 +58,46 @@
 
   const ICONES_SERVICO = { sofa: "🛋️", colchao: "🛏️", poltrona: "🪑", tapete: "🧶" };
   const NOMES_SERVICO = { sofa: "Sofá", colchao: "Colchão", poltrona: "Poltrona", tapete: "Tapete" };
-  const NOMES_STATUS = { agendado: "Agendado", andamento: "Em andamento", concluido: "Concluído" };
 
-  const inputData = document.getElementById("dataSelecionada");
-  inputData.value = new Date().toISOString().slice(0, 10);
+  const campoData = document.getElementById("campoDataRota");
+  campoData.value = new Date().toISOString().slice(0, 10);
 
-  document.getElementById("btnDiaAnterior").addEventListener("click", () => {
-    const d = new Date(inputData.value + "T12:00:00");
-    d.setDate(d.getDate() - 1);
-    inputData.value = d.toISOString().slice(0, 10);
-    carregarRota();
-  });
-
-  document.getElementById("btnDiaProximo").addEventListener("click", () => {
-    const d = new Date(inputData.value + "T12:00:00");
-    d.setDate(d.getDate() + 1);
-    inputData.value = d.toISOString().slice(0, 10);
-    carregarRota();
-  });
-
-  inputData.addEventListener("change", carregarRota);
+  function linkMaps(endereco, bairro) {
+    const destino = encodeURIComponent([endereco, bairro, "Fortaleza, CE"].filter(Boolean).join(", "));
+    return `https://www.google.com/maps/search/?api=1&query=${destino}`;
+  }
 
   async function carregarRota() {
     const container = document.getElementById("listaRota");
-    const dataISO = inputData.value;
-    const hojeISO = new Date().toISOString().slice(0, 10);
-
-    document.getElementById("tituloRota").textContent =
-      dataISO === hojeISO ? "Rota de hoje" : `Rota de ${formatarData(dataISO)}`;
-
+    container.innerHTML = `<div class="empty-state"><div class="empty-icon">🗺️</div><p>Carregando...</p></div>`;
     try {
-      const paradas = await listarAgendamentosDoDia(dataISO);
+      const lista = await listarAgendamentosPorData(campoData.value);
+      const ativos = lista.filter((a) => a.status !== "cancelado");
 
-      document.getElementById("subtituloRota").textContent =
-        paradas.length === 0 ? "Nenhum serviço nesta data" : `${paradas.length} serviço(s) — ordenados por horário`;
-
-      if (paradas.length === 0) {
-        container.innerHTML = `<div class="empty-state"><div class="empty-icon">🗺️</div><p>Nenhum serviço agendado para esta data.</p></div>`;
+      if (ativos.length === 0) {
+        container.innerHTML = `<div class="empty-state"><div class="empty-icon">🗺️</div><p>Nenhum serviço agendado para este dia.</p></div>`;
         return;
       }
 
-      container.innerHTML = paradas.map((p) => {
-        const endereco = p.clientes?.endereco;
-        const linkMaps = gerarLinkGoogleMaps(endereco);
+      // Ordena pelo horário real do agendamento (campo "horario"), sem horário vai por último
+      const comHorario = ativos
+        .map((a) => ({ ...a, _horario: a.horario ? a.horario.slice(0, 5) : null }))
+        .sort((a, b) => (a._horario || "99:99").localeCompare(b._horario || "99:99"));
+
+      container.innerHTML = comHorario.map((a) => {
+        const cliente = a.clientes || {};
+        const endereco = cliente.endereco || cliente.bairro || "";
         return `
-          <div class="parada">
-            <div class="parada-hora">${formatarHorario(p.horario)}</div>
-            <div class="parada-corpo">
-              <div class="parada-cliente">${ICONES_SERVICO[p.tipo_servico] || ""} ${p.clientes?.nome || "Cliente"} — ${NOMES_SERVICO[p.tipo_servico] || p.tipo_servico}</div>
-              <div class="parada-endereco">${endereco || "Endereço não cadastrado"}${p.clientes?.telefone ? " · " + p.clientes.telefone : ""}</div>
-              <div class="parada-tags">
-                <span class="badge">${NOMES_STATUS[p.status] || p.status}</span>
-                ${p.equipe?.nome ? `<span class="badge">👤 ${p.equipe.nome}</span>` : `<span class="badge">👤 Não atribuído</span>`}
-              </div>
+          <div class="rota-item">
+            <div class="rota-hora">${a._horario || "—"}</div>
+            <div class="rota-info">
+              <div class="cliente">${cliente.nome || "Cliente"}</div>
+              <div class="endereco">${endereco || "Endereço não informado"}${cliente.telefone ? " · " + cliente.telefone : ""}</div>
+              <div class="servico">${ICONES_SERVICO[a.tipo_servico] || ""} ${NOMES_SERVICO[a.tipo_servico] || a.tipo_servico} — <span class="badge badge-${a.status === 'concluido' ? 'pago' : 'pendente'}">${a.status}</span></div>
             </div>
-            <div class="parada-acoes">
-              ${linkMaps
-                ? `<a class="btn-maps" href="${linkMaps}" target="_blank" rel="noopener">📍 Abrir no Maps</a>`
-                : `<span class="btn-maps disabled">📍 Sem endereço</span>`}
+            <div class="rota-acoes">
+              ${endereco ? `<a href="${linkMaps(cliente.endereco, cliente.bairro)}" target="_blank" rel="noopener" class="btn btn-outline" style="font-size:0.78rem; padding:8px 12px;">📍 Mapa</a>` : ""}
+              ${cliente.telefone ? `<a href="https://wa.me/55${cliente.telefone.replace(/\D/g,'')}" target="_blank" rel="noopener" class="btn btn-outline" style="font-size:0.78rem; padding:8px 12px;">💬 Whats</a>` : ""}
             </div>
           </div>`;
       }).join("");
@@ -180,6 +106,20 @@
       container.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><p>Não foi possível carregar. Verifique a conexão com o Supabase.</p></div>`;
     }
   }
+
+  document.getElementById("btnDiaAnterior").addEventListener("click", () => {
+    const d = new Date(campoData.value + "T12:00:00");
+    d.setDate(d.getDate() - 1);
+    campoData.value = d.toISOString().slice(0, 10);
+    carregarRota();
+  });
+  document.getElementById("btnDiaProximo").addEventListener("click", () => {
+    const d = new Date(campoData.value + "T12:00:00");
+    d.setDate(d.getDate() + 1);
+    campoData.value = d.toISOString().slice(0, 10);
+    carregarRota();
+  });
+  campoData.addEventListener("change", carregarRota);
 
   carregarRota();
 </script>
