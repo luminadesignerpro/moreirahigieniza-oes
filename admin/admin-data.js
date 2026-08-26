@@ -2,13 +2,11 @@
 // ADMIN — CAMADA DE DADOS (Supabase)
 // Funções compartilhadas entre todas as páginas
 // do painel admin. Tabelas usadas:
-//   - clientes        (agora com campo endereco)
-//   - agendamentos    (agora com horario e equipe_id)
+//   - clientes
+//   - agendamentos   (1 serviço = 1 agendamento)
 //   - galeria
-//   - usuarios_admin  (login)
-//   - bot_config      (fluxo do WhatsApp Bot + config Evolution API)
-//   - despesas_gerais (gastos do negócio, fora do custo por serviço)
-//   - equipe          (ajudantes/funcionários)
+//   - usuarios_admin (login)
+//   - bot_config     (fluxo do WhatsApp Bot + config Evolution API)
 // ============================================
 
 const STATUS_AGENDAMENTO = {
@@ -24,13 +22,6 @@ const STATUS_PAGAMENTO = {
 };
 
 const FORMAS_PAGAMENTO = ["pix", "dinheiro", "cartao"];
-
-const CATEGORIAS_DESPESA = {
-  gasolina: "Gasolina",
-  manutencao_extratora: "Manutenção da extratora",
-  material_limpeza: "Material de limpeza",
-  outros: "Outros"
-};
 
 // --------------------------------------------
 // CLIENTES
@@ -56,14 +47,18 @@ async function buscarOuCriarCliente({ nome, telefone, bairro, endereco }) {
   if (errBusca) throw errBusca;
 
   if (existente) {
-    if (endereco && endereco !== existente.endereco) {
-      const { data: atualizado, error: errAtualizar } = await supabase
+    // Atualiza endereço/bairro se vieram preenchidos e mudaram
+    const campos = {};
+    if (endereco && endereco !== existente.endereco) campos.endereco = endereco;
+    if (bairro && bairro !== existente.bairro) campos.bairro = bairro;
+    if (Object.keys(campos).length > 0) {
+      const { data: atualizado, error: errUpd } = await supabase
         .from("clientes")
-        .update({ endereco })
+        .update(campos)
         .eq("id", existente.id)
         .select()
         .single();
-      if (errAtualizar) throw errAtualizar;
+      if (errUpd) throw errUpd;
       return atualizado;
     }
     return existente;
@@ -85,7 +80,7 @@ async function listarAgendamentos({ status = null, limite = 100 } = {}) {
   const supabase = await getSupabaseClient();
   let query = supabase
     .from("agendamentos")
-    .select("*, clientes(nome, telefone, bairro, endereco), equipe(nome)")
+    .select("*, clientes(nome, telefone, bairro)")
     .order("data_servico", { ascending: false })
     .limit(limite);
 
@@ -125,54 +120,74 @@ async function excluirAgendamento(id) {
   if (error) throw error;
 }
 
-// --------------------------------------------
-// ROTA DO DIA — agendamentos de uma data, ordenados por horário
-// --------------------------------------------
-async function listarAgendamentosDoDia(dataISO) {
+// Lista os agendamentos de uma data específica (rota do dia), com
+// endereço do cliente já embutido pra montar o link do mapa.
+async function listarAgendamentosPorData(dataISO) {
   const supabase = await getSupabaseClient();
   const { data, error } = await supabase
     .from("agendamentos")
-    .select("*, clientes(nome, telefone, bairro, endereco), equipe(nome)")
+    .select("*, clientes(nome, telefone, bairro, endereco)")
     .eq("data_servico", dataISO)
-    .neq("status", "cancelado")
-    .order("horario", { ascending: true, nullsFirst: false });
+    .order("criado_em", { ascending: true });
   if (error) throw error;
   return data || [];
 }
 
-function gerarLinkGoogleMaps(endereco) {
-  if (!endereco) return null;
-  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(endereco)}`;
-}
-
 // --------------------------------------------
-// EQUIPE (ajudantes que atendem os serviços)
+// DESPESAS GERAIS (fora do custo por serviço)
 // --------------------------------------------
-async function listarEquipe({ apenasAtivos = false } = {}) {
+async function listarDespesas({ mes, ano } = {}) {
   const supabase = await getSupabaseClient();
-  let query = supabase.from("equipe").select("*").order("nome", { ascending: true });
-  if (apenasAtivos) query = query.eq("ativo", true);
+  let query = supabase.from("despesas").select("*").order("data_despesa", { ascending: false });
+
+  if (mes !== undefined && ano !== undefined) {
+    const inicio = new Date(ano, mes, 1).toISOString().slice(0, 10);
+    const fim = new Date(ano, mes + 1, 1).toISOString().slice(0, 10);
+    query = query.gte("data_despesa", inicio).lt("data_despesa", fim);
+  }
+
   const { data, error } = await query;
   if (error) throw error;
   return data || [];
 }
 
-async function criarMembroEquipe({ nome, telefone }) {
+async function criarDespesa(payload) {
   const supabase = await getSupabaseClient();
-  const { data, error } = await supabase
-    .from("equipe")
-    .insert([{ nome, telefone, ativo: true }])
-    .select()
-    .single();
+  const { data, error } = await supabase.from("despesas").insert([payload]).select().single();
   if (error) throw error;
   return data;
 }
 
-async function atualizarMembroEquipe(id, campos) {
+async function excluirDespesa(id) {
+  const supabase = await getSupabaseClient();
+  const { error } = await supabase.from("despesas").delete().eq("id", id);
+  if (error) throw error;
+}
+
+// --------------------------------------------
+// DEPOIMENTOS (avaliações de clientes)
+// --------------------------------------------
+async function listarDepoimentos({ apenasAprovados = false } = {}) {
+  const supabase = await getSupabaseClient();
+  let query = supabase.from("depoimentos").select("*").order("criado_em", { ascending: false });
+  if (apenasAprovados) query = query.eq("aprovado", true);
+  const { data, error } = await query;
+  if (error) throw error;
+  return data || [];
+}
+
+async function criarDepoimento(payload) {
+  const supabase = await getSupabaseClient();
+  const { data, error } = await supabase.from("depoimentos").insert([payload]).select().single();
+  if (error) throw error;
+  return data;
+}
+
+async function aprovarDepoimento(id, aprovado) {
   const supabase = await getSupabaseClient();
   const { data, error } = await supabase
-    .from("equipe")
-    .update(campos)
+    .from("depoimentos")
+    .update({ aprovado })
     .eq("id", id)
     .select()
     .single();
@@ -180,9 +195,9 @@ async function atualizarMembroEquipe(id, campos) {
   return data;
 }
 
-async function excluirMembroEquipe(id) {
+async function excluirDepoimento(id) {
   const supabase = await getSupabaseClient();
-  const { error } = await supabase.from("equipe").delete().eq("id", id);
+  const { error } = await supabase.from("depoimentos").delete().eq("id", id);
   if (error) throw error;
 }
 
@@ -209,12 +224,14 @@ async function calcularResumoFinanceiro({ mes, ano } = {}) {
   if (error) throw error;
   const servicos = data || [];
 
+  const despesasGerais = await listarDespesas({ mes: mesRef, ano: anoRef });
+  const totalDespesasGerais = despesasGerais.reduce((soma, d) => soma + (Number(d.valor) || 0), 0);
+
   const resumo = {
     receitaTotal: 0,
     custoTotal: 0,
+    despesasGerais: totalDespesasGerais,
     lucroLiquido: 0,
-    despesasGerais: 0,
-    lucroLiquidoReal: 0,
     totalServicos: servicos.length,
     pendentes: 0,
     valorPendente: 0,
@@ -242,13 +259,24 @@ async function calcularResumoFinanceiro({ mes, ano } = {}) {
     }
   });
 
-  resumo.lucroLiquido = resumo.receitaTotal - resumo.custoTotal;
-
-  const despesasGerais = await somarDespesasGerais({ mes: mesRef, ano: anoRef });
-  resumo.despesasGerais = despesasGerais;
-  resumo.lucroLiquidoReal = resumo.lucroLiquido - despesasGerais;
-
+  resumo.lucroLiquido = resumo.receitaTotal - resumo.custoTotal - resumo.despesasGerais;
   return resumo;
+}
+
+// Histórico dos últimos N meses (receita, custo, despesas, lucro) — usado no gráfico do Financeiro.
+async function calcularHistoricoFinanceiro(meses = 6) {
+  const agora = new Date();
+  const historico = [];
+  for (let i = meses - 1; i >= 0; i--) {
+    const ref = new Date(agora.getFullYear(), agora.getMonth() - i, 1);
+    const resumo = await calcularResumoFinanceiro({ mes: ref.getMonth(), ano: ref.getFullYear() });
+    historico.push({
+      label: ref.toLocaleDateString("pt-BR", { month: "short", year: "2-digit" }),
+      receita: resumo.receitaTotal,
+      lucro: resumo.lucroLiquido
+    });
+  }
+  return historico;
 }
 
 async function listarServicoMaisPedido() {
@@ -263,82 +291,6 @@ async function listarServicoMaisPedido() {
     contagem[s.tipo_servico] = (contagem[s.tipo_servico] || 0) + 1;
   });
   return contagem;
-}
-
-// --------------------------------------------
-// DESPESAS GERAIS (fora do custo por serviço)
-// --------------------------------------------
-async function listarDespesasGerais({ mes, ano } = {}) {
-  const supabase = await getSupabaseClient();
-  let query = supabase.from("despesas_gerais").select("*").order("data_despesa", { ascending: false });
-
-  if (mes !== undefined && ano !== undefined) {
-    const inicio = new Date(ano, mes, 1).toISOString().slice(0, 10);
-    const fim = new Date(ano, mes + 1, 1).toISOString().slice(0, 10);
-    query = query.gte("data_despesa", inicio).lt("data_despesa", fim);
-  }
-
-  const { data, error } = await query;
-  if (error) throw error;
-  return data || [];
-}
-
-async function criarDespesaGeral({ descricao, categoria, valor, data_despesa }) {
-  const supabase = await getSupabaseClient();
-  const { data, error } = await supabase
-    .from("despesas_gerais")
-    .insert([{ descricao, categoria, valor, data_despesa }])
-    .select()
-    .single();
-  if (error) throw error;
-  return data;
-}
-
-async function excluirDespesaGeral(id) {
-  const supabase = await getSupabaseClient();
-  const { error } = await supabase.from("despesas_gerais").delete().eq("id", id);
-  if (error) throw error;
-}
-
-async function somarDespesasGerais({ mes, ano }) {
-  const despesas = await listarDespesasGerais({ mes, ano });
-  return despesas.reduce((soma, d) => soma + (Number(d.valor) || 0), 0);
-}
-
-// --------------------------------------------
-// FATURAMENTO MENSAL (para o gráfico de tendência)
-// --------------------------------------------
-async function calcularFaturamentoMensal(quantidadeMeses = 12) {
-  const supabase = await getSupabaseClient();
-  const agora = new Date();
-  const inicio = new Date(agora.getFullYear(), agora.getMonth() - (quantidadeMeses - 1), 1)
-    .toISOString().slice(0, 10);
-
-  const { data, error } = await supabase
-    .from("agendamentos")
-    .select("valor_cobrado, custo_produto, status_pagamento, data_servico")
-    .gte("data_servico", inicio);
-  if (error) throw error;
-
-  const meses = [];
-  for (let i = quantidadeMeses - 1; i >= 0; i--) {
-    const d = new Date(agora.getFullYear(), agora.getMonth() - i, 1);
-    meses.push({ ano: d.getFullYear(), mes: d.getMonth(), receita: 0, lucro: 0 });
-  }
-
-  (data || []).forEach((a) => {
-    if (a.status_pagamento !== "pago") return;
-    const d = new Date(a.data_servico);
-    const alvo = meses.find((m) => m.ano === d.getFullYear() && m.mes === d.getMonth());
-    if (alvo) {
-      const valor = Number(a.valor_cobrado) || 0;
-      const custo = Number(a.custo_produto) || 0;
-      alvo.receita += valor;
-      alvo.lucro += valor - custo;
-    }
-  });
-
-  return meses;
 }
 
 // --------------------------------------------
@@ -435,11 +387,6 @@ function formatarData(dataISO) {
   if (!dataISO) return "—";
   const d = new Date(dataISO);
   return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
-}
-
-function formatarHorario(horario) {
-  if (!horario) return "—";
-  return horario.slice(0, 5);
 }
 
 function mostrarToast(mensagem, tipo = "default") {
