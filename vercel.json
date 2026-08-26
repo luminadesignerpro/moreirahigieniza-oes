@@ -2,5 +2,8 @@
   "rewrites": [
     { "source": "/admin", "destination": "/admin/login.html" },
     { "source": "/admin/", "destination": "/admin/login.html" }
+  ],
+  "crons": [
+    { "path": "/api/enviar-lembretes", "schedule": "0 12 * * *" }
   ]
 }
