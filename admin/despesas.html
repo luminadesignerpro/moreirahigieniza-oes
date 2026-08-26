@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Despesas — Painel Moreira Higienizações</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..900&family=Work+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="admin-styles.css">
+</head>
+<body>
+
+<main class="main">
+  <div class="topbar">
+    <div>
+      <h2>Despesas</h2>
+      <p class="subtitle">Gastos gerais do negócio — combustível, manutenção, material, marketing.</p>
+    </div>
+    <button class="btn btn-primary" id="btnNovaDespesa">+ Nova despesa</button>
+  </div>
+
+  <div class="metrics-grid" style="grid-template-columns: 1fr;">
+    <div class="metric-card accent">
+      <div class="metric-label">🧾 Total do mês</div>
+      <div class="metric-value" id="totalMesDespesas">R$ 0</div>
+      <div class="metric-delta" id="qtdMesDespesas">—</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div id="tabelaDespesas">
+      <div class="empty-state"><div class="empty-icon">🧾</div><p>Carregando...</p></div>
+    </div>
+  </div>
+</main>
+
+<!-- MODAL NOVA DESPESA -->
+<div class="modal-overlay" id="modalDespesa">
+  <div class="modal-box">
+    <h3>Nova despesa</h3>
+    <form id="formDespesa">
+      <div class="field">
+        <label>Descrição</label>
+        <input type="text" id="campoDescricao" required placeholder="Ex: Gasolina, produto de limpeza...">
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Categoria</label>
+          <select id="campoCategoria">
+            <option value="combustivel">⛽ Combustível</option>
+            <option value="manutencao">🔧 Manutenção</option>
+            <option value="material">🧴 Material</option>
+            <option value="marketing">📣 Marketing</option>
+            <option value="outro">📦 Outro</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Valor (R$)</label>
+          <input type="number" id="campoValor" step="0.01" min="0" required placeholder="50.00">
+        </div>
+      </div>
+      <div class="field">
+        <label>Data</label>
+        <input type="date" id="campoData" required>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-outline" id="btnCancelarDespesa">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Salvar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="../supabase-loader.js"></script>
+<script src="../config.js"></script>
+<script src="admin-data.js"></script>
+<script src="admin-sidebar.js"></script>
+<script>
+  protegerPagina();
+  montarSidebar("despesas");
+
+  const ICONES_CATEGORIA = { combustivel: "⛽", manutencao: "🔧", material: "🧴", marketing: "📣", outro: "📦" };
+  const NOMES_CATEGORIA = { combustivel: "Combustível", manutencao: "Manutenção", material: "Material", marketing: "Marketing", outro: "Outro" };
+
+  let despesasCache = [];
+
+  async function carregarDespesas() {
+    const container = document.getElementById("tabelaDespesas");
+    try {
+      const agora = new Date();
+      despesasCache = await listarDespesas({ mes: agora.getMonth(), ano: agora.getFullYear() });
+
+      const total = despesasCache.reduce((s, d) => s + (Number(d.valor) || 0), 0);
+      document.getElementById("totalMesDespesas").textContent = formatarMoeda(total);
+      document.getElementById("qtdMesDespesas").textContent = `${despesasCache.length} lançamento(s) este mês`;
+
+      renderizarTabela();
+    } catch (err) {
+      console.error(err);
+      container.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><p>Não foi possível carregar. Verifique a conexão com o Supabase.</p></div>`;
+    }
+  }
+
+  function renderizarTabela() {
+    const container = document.getElementById("tabelaDespesas");
+    if (despesasCache.length === 0) {
+      container.innerHTML = `<div class="empty-state"><div class="empty-icon">🧾</div><p>Nenhuma despesa registrada este mês.</p></div>`;
+      return;
+    }
+
+    container.innerHTML = `
+      <div class="table-scroll"><table>
+        <thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th>Valor</th><th></th></tr></thead>
+        <tbody>
+          ${despesasCache.map((d) => `
+            <tr>
+              <td>${formatarData(d.data_despesa)}</td>
+              <td>${d.descricao}</td>
+              <td>${ICONES_CATEGORIA[d.categoria] || ""} ${NOMES_CATEGORIA[d.categoria] || d.categoria}</td>
+              <td>${formatarMoeda(d.valor)}</td>
+              <td><button class="btn-icon danger btn-excluir-despesa" data-id="${d.id}" title="Excluir">🗑️</button></td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table></div>`;
+
+    document.querySelectorAll(".btn-excluir-despesa").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        if (!confirm("Excluir esta despesa?")) return;
+        try {
+          await excluirDespesa(btn.dataset.id);
+          mostrarToast("Despesa excluída.", "success");
+          await carregarDespesas();
+        } catch (err) {
+          mostrarToast("Erro ao excluir.", "error");
+        }
+      });
+    });
+  }
+
+  const modal = document.getElementById("modalDespesa");
+  const form = document.getElementById("formDespesa");
+
+  document.getElementById("btnNovaDespesa").addEventListener("click", () => {
+    form.reset();
+    document.getElementById("campoData").value = new Date().toISOString().slice(0, 10);
+    modal.classList.add("open");
+  });
+  document.getElementById("btnCancelarDespesa").addEventListener("click", () => modal.classList.remove("open"));
+  modal.addEventListener("click", (e) => { if (e.target === modal) modal.classList.remove("open"); });
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    try {
+      await criarDespesa({
+        descricao: document.getElementById("campoDescricao").value.trim(),
+        categoria: document.getElementById("campoCategoria").value,
+        valor: parseFloat(document.getElementById("campoValor").value) || 0,
+        data_despesa: document.getElementById("campoData").value
+      });
+      mostrarToast("Despesa registrada.", "success");
+      modal.classList.remove("open");
+      await carregarDespesas();
+    } catch (err) {
+      console.error(err);
+      mostrarToast("Erro ao salvar despesa.", "error");
+    }
+  });
+
+  carregarDespesas();
+</script>
+</body>
+</html>
