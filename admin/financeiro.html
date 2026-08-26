@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..900&family=Work+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="admin-styles.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
 <style>
   .mes-seletor {
     display: flex;
@@ -40,6 +41,29 @@
   .pagamento-info .nome { font-size: 0.85rem; font-weight: 600; color: var(--azul-marinho); margin-bottom: 6px; display:flex; justify-content:space-between; }
   .pagamento-bar-bg { background: #ECEAE0; border-radius: 100px; height: 8px; overflow: hidden; }
   .pagamento-bar-fill { height: 100%; border-radius: 100px; }
+
+  .despesa-form {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr 0.8fr 0.9fr auto;
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+  .despesa-form input, .despesa-form select {
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid #E4E0D2;
+    font-family: 'Work Sans', sans-serif;
+    font-size: 0.9rem;
+  }
+  .despesa-lista table { width: 100%; }
+  .despesa-lista .btn-excluir {
+    background: none;
+    border: none;
+    color: var(--vermelho-erro);
+    cursor: pointer;
+    font-size: 1rem;
+  }
+  .chart-container { position: relative; height: 280px; }
 </style>
 </head>
 <body>
@@ -72,7 +96,12 @@
       <div class="metric-delta">Descontado da receita</div>
     </div>
     <div class="metric-card">
-      <div class="metric-label">📈 Lucro líquido</div>
+      <div class="metric-label">🧾 Despesas gerais</div>
+      <div class="metric-value" id="fDespesasGerais">R$ 0</div>
+      <div class="metric-delta">Gasolina, extratora, material</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">📈 Lucro líquido real</div>
       <div class="metric-value" id="fLucro">R$ 0</div>
       <div class="metric-delta" id="fMargem">—</div>
     </div>
@@ -80,6 +109,18 @@
       <div class="metric-label">⏳ A receber</div>
       <div class="metric-value" id="fPendente">R$ 0</div>
       <div class="metric-delta" id="fPendenteQtd">—</div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom: 22px;">
+    <div class="card-header">
+      <div>
+        <h3>Faturamento mês a mês</h3>
+        <p>Últimos 12 meses — receita recebida e lucro (antes das despesas gerais)</p>
+      </div>
+    </div>
+    <div class="chart-container">
+      <canvas id="graficoFaturamento"></canvas>
     </div>
   </div>
 
@@ -108,6 +149,32 @@
       </div>
     </div>
   </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <h3>Despesas gerais do negócio</h3>
+        <p>Gasolina, manutenção da extratora, material de limpeza e outros gastos — fora do custo por serviço</p>
+      </div>
+    </div>
+
+    <form class="despesa-form" id="formDespesa">
+      <input type="text" id="despesaDescricao" placeholder="Descrição (ex: Abastecimento carro)" required>
+      <select id="despesaCategoria" required>
+        <option value="gasolina">Gasolina</option>
+        <option value="manutencao_extratora">Manutenção da extratora</option>
+        <option value="material_limpeza">Material de limpeza</option>
+        <option value="outros">Outros</option>
+      </select>
+      <input type="number" id="despesaValor" placeholder="Valor (R$)" step="0.01" min="0" required>
+      <input type="date" id="despesaData" required>
+      <button type="submit" class="btn btn-gold">+ Adicionar</button>
+    </form>
+
+    <div class="despesa-lista" id="listaDespesas">
+      <div class="empty-state"><div class="empty-icon">🧾</div><p>Carregando...</p></div>
+    </div>
+  </div>
 </main>
 
 <script src="../supabase-loader.js"></script>
@@ -119,16 +186,22 @@
   montarSidebar("financeiro");
 
   const NOMES_MES = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+  const NOMES_MES_ABREV = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
   const ICONES_SERVICO = { sofa: "🛋️", colchao: "🛏️", poltrona: "🪑", tapete: "🧶" };
   const NOMES_SERVICO = { sofa: "Sofá", colchao: "Colchão", poltrona: "Poltrona", tapete: "Tapete" };
   const ICONES_PAGAMENTO = { pix: "📱", dinheiro: "💵", cartao: "💳" };
   const NOMES_PAGAMENTO = { pix: "Pix", dinheiro: "Dinheiro", cartao: "Cartão" };
   const CORES_PAGAMENTO = { pix: "#3D7BC4", dinheiro: "#2E9E6B", cartao: "#C99A4A" };
+  const ICONES_DESPESA = { gasolina: "⛽", manutencao_extratora: "🔧", material_limpeza: "🧴", outros: "📦" };
 
   const agora = new Date();
   let mesSelecionado = agora.getMonth();
   let anoSelecionado = agora.getFullYear();
   let agendamentosDoMes = [];
+  let despesasDoMes = [];
+  let graficoFaturamento = null;
+
+  document.getElementById("despesaData").value = agora.toISOString().slice(0, 10);
 
   function atualizarLabelMes() {
     document.getElementById("mesAtualLabel").textContent = `${NOMES_MES[mesSelecionado]} ${anoSelecionado}`;
@@ -158,10 +231,12 @@
 
       document.getElementById("fCusto").textContent = formatarMoeda(resumo.custoTotal);
 
-      document.getElementById("fLucro").textContent = formatarMoeda(resumo.lucroLiquido);
-      const margem = resumo.receitaTotal > 0 ? ((resumo.lucroLiquido / resumo.receitaTotal) * 100).toFixed(0) : 0;
+      document.getElementById("fDespesasGerais").textContent = formatarMoeda(resumo.despesasGerais);
+
+      document.getElementById("fLucro").textContent = formatarMoeda(resumo.lucroLiquidoReal);
+      const margem = resumo.receitaTotal > 0 ? ((resumo.lucroLiquidoReal / resumo.receitaTotal) * 100).toFixed(0) : 0;
       document.getElementById("fMargem").textContent = `Margem de ${margem}%`;
-      document.getElementById("fMargem").className = "metric-delta " + (resumo.lucroLiquido >= 0 ? "up" : "down");
+      document.getElementById("fMargem").className = "metric-delta " + (resumo.lucroLiquidoReal >= 0 ? "up" : "down");
 
       document.getElementById("fPendente").textContent = formatarMoeda(resumo.valorPendente);
       document.getElementById("fPendenteQtd").textContent = `${resumo.pendentes} serviço(s) pendente(s)`;
@@ -174,6 +249,9 @@
       agendamentosDoMes = todos.filter((a) => a.data_servico >= inicio.slice(0,10) && a.data_servico < fim.slice(0,10));
 
       renderizarTabelaFinanceiro(agendamentosDoMes);
+
+      despesasDoMes = await listarDespesasGerais({ mes: mesSelecionado, ano: anoSelecionado });
+      renderizarListaDespesas(despesasDoMes);
     } catch (err) {
       console.error(err);
       document.getElementById("tabelaFinanceiro").innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><p>Não foi possível carregar. Verifique a conexão com o Supabase.</p></div>`;
@@ -236,6 +314,121 @@
       </table>`;
   }
 
+  function renderizarListaDespesas(lista) {
+    const container = document.getElementById("listaDespesas");
+    if (lista.length === 0) {
+      container.innerHTML = `<div class="empty-state"><div class="empty-icon">🧾</div><p>Nenhuma despesa registrada neste mês.</p></div>`;
+      return;
+    }
+
+    const ordenada = [...lista].sort((a, b) => (b.data_despesa || "").localeCompare(a.data_despesa || ""));
+
+    container.innerHTML = `
+      <table>
+        <thead>
+          <tr><th>Data</th><th>Descrição</th><th>Categoria</th><th>Valor</th><th></th></tr>
+        </thead>
+        <tbody>
+          ${ordenada.map((d) => `
+            <tr>
+              <td>${formatarData(d.data_despesa)}</td>
+              <td>${d.descricao}</td>
+              <td>${ICONES_DESPESA[d.categoria] || ""} ${CATEGORIAS_DESPESA[d.categoria] || d.categoria}</td>
+              <td>${formatarMoeda(d.valor)}</td>
+              <td><button class="btn-excluir" data-id="${d.id}" title="Excluir">✕</button></td>
+            </tr>`).join("")}
+        </tbody>
+      </table>`;
+
+    container.querySelectorAll(".btn-excluir").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        if (!confirm("Excluir esta despesa?")) return;
+        try {
+          await excluirDespesaGeral(btn.dataset.id);
+          mostrarToast("Despesa excluída.", "success");
+          carregarFinanceiro();
+        } catch (err) {
+          console.error(err);
+          mostrarToast("Erro ao excluir despesa.", "error");
+        }
+      });
+    });
+  }
+
+  document.getElementById("formDespesa").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const descricao = document.getElementById("despesaDescricao").value.trim();
+    const categoria = document.getElementById("despesaCategoria").value;
+    const valor = parseFloat(document.getElementById("despesaValor").value);
+    const data_despesa = document.getElementById("despesaData").value;
+
+    if (!descricao || !valor || !data_despesa) {
+      mostrarToast("Preencha todos os campos.", "error");
+      return;
+    }
+
+    try {
+      await criarDespesaGeral({ descricao, categoria, valor, data_despesa });
+      mostrarToast("Despesa adicionada.", "success");
+      document.getElementById("formDespesa").reset();
+      document.getElementById("despesaData").value = agora.toISOString().slice(0, 10);
+      carregarFinanceiro();
+    } catch (err) {
+      console.error(err);
+      mostrarToast("Erro ao adicionar despesa.", "error");
+    }
+  });
+
+  async function carregarGraficoFaturamento() {
+    try {
+      const meses = await calcularFaturamentoMensal(12);
+      const labels = meses.map((m) => `${NOMES_MES_ABREV[m.mes]}/${String(m.ano).slice(2)}`);
+      const receitas = meses.map((m) => m.receita);
+      const lucros = meses.map((m) => m.lucro);
+
+      const ctx = document.getElementById("graficoFaturamento").getContext("2d");
+      if (graficoFaturamento) graficoFaturamento.destroy();
+      graficoFaturamento = new Chart(ctx, {
+        type: "line",
+        data: {
+          labels,
+          datasets: [
+            {
+              label: "Receita",
+              data: receitas,
+              borderColor: "#3D7BC4",
+              backgroundColor: "rgba(61,123,196,0.12)",
+              fill: true,
+              tension: 0.3
+            },
+            {
+              label: "Lucro (antes das despesas gerais)",
+              data: lucros,
+              borderColor: "#2E9E6B",
+              backgroundColor: "rgba(46,158,107,0.08)",
+              fill: true,
+              tension: 0.3
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { position: "bottom" } },
+          scales: {
+            y: {
+              ticks: {
+                callback: (valor) => formatarMoeda(valor)
+              }
+            }
+          }
+        }
+      });
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
   document.getElementById("btnExportar").addEventListener("click", () => {
     if (agendamentosDoMes.length === 0) {
       mostrarToast("Nenhum dado para exportar neste mês.", "error");
@@ -267,6 +460,7 @@
   });
 
   carregarFinanceiro();
+  carregarGraficoFaturamento();
 </script>
 </body>
 </html>
