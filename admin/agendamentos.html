@@ -71,7 +71,14 @@
       <div class="field-row">
         <div class="field">
           <label>Horário</label>
-          <input type="time" id="campoHorario">
+          <div class="horario-selects">
+            <select id="campoHora">
+              <option value="">Hora</option>
+            </select>
+            <select id="campoMinuto">
+              <option value="">Min</option>
+            </select>
+          </div>
         </div>
         <div class="field">
           <label>Repete a cada quantos meses?</label>
@@ -150,6 +157,42 @@
 
   const ICONES_SERVICO = { sofa: "🛋️", colchao: "🛏️", poltrona: "🪑", tapete: "🧶" };
   const NOMES_SERVICO = { sofa: "Sofá", colchao: "Colchão", poltrona: "Poltrona", tapete: "Tapete" };
+
+  // ----- HORÁRIO (hora/minuto, 24 opções escritas por extenso) -----
+  const HORAS_EXTENSO = [
+    "Meia-noite", "Uma hora", "Duas horas", "Três horas", "Quatro horas", "Cinco horas",
+    "Seis horas", "Sete horas", "Oito horas", "Nove horas", "Dez horas", "Onze horas",
+    "Meio-dia", "Treze horas", "Catorze horas", "Quinze horas", "Dezesseis horas",
+    "Dezessete horas", "Dezoito horas", "Dezenove horas", "Vinte horas", "Vinte e uma horas",
+    "Vinte e duas horas", "Vinte e três horas"
+  ];
+  const MINUTOS_DISPONIVEIS = ["00", "15", "30", "45"];
+
+  function preencherSelectsHorario() {
+    const selectHora = document.getElementById("campoHora");
+    const selectMinuto = document.getElementById("campoMinuto");
+
+    selectHora.innerHTML = '<option value="">Hora</option>' + HORAS_EXTENSO.map((nome, i) => {
+      const valor = String(i).padStart(2, "0");
+      return `<option value="${valor}">${valor}h — ${nome}</option>`;
+    }).join("");
+
+    selectMinuto.innerHTML = '<option value="">Min</option>' + MINUTOS_DISPONIVEIS.map((m) => `<option value="${m}">${m}</option>`).join("");
+  }
+  preencherSelectsHorario();
+
+  function montarHorarioSelecionado() {
+    const hora = document.getElementById("campoHora").value;
+    const minuto = document.getElementById("campoMinuto").value;
+    if (!hora) return null;
+    return `${hora}:${minuto || "00"}`;
+  }
+
+  function preencherHorarioNosSelects(horarioSalvo) {
+    const [hora, minuto] = (horarioSalvo || "").split(":");
+    document.getElementById("campoHora").value = hora || "";
+    document.getElementById("campoMinuto").value = minuto || "00";
+  }
 
   let agendamentosCache = [];
   let filtroAtual = "todos";
@@ -280,6 +323,8 @@
     form.reset();
     document.getElementById("agendamentoId").value = "";
     document.getElementById("campoDataServico").value = new Date().toISOString().slice(0, 10);
+    document.getElementById("campoHora").value = "";
+    document.getElementById("campoMinuto").value = "00";
     modal.classList.add("open");
   });
 
@@ -297,7 +342,7 @@
     document.getElementById("campoEndereco").value = ag.clientes?.endereco || "";
     document.getElementById("campoTipoServico").value = ag.tipo_servico;
     document.getElementById("campoDataServico").value = (ag.data_servico || "").slice(0, 10);
-    document.getElementById("campoHorario").value = (ag.horario || "").slice(0, 5);
+    preencherHorarioNosSelects((ag.horario || "").slice(0, 5));
     document.getElementById("campoRecorrencia").value = ag.recorrencia_meses || "";
     document.getElementById("campoValor").value = ag.valor_cobrado;
     document.getElementById("campoCusto").value = ag.custo_produto || 0;
@@ -323,7 +368,7 @@
         cliente_id: cliente.id,
         tipo_servico: document.getElementById("campoTipoServico").value,
         data_servico: document.getElementById("campoDataServico").value,
-        horario: document.getElementById("campoHorario").value || null,
+        horario: montarHorarioSelecionado(),
         recorrencia_meses: document.getElementById("campoRecorrencia").value
           ? parseInt(document.getElementById("campoRecorrencia").value) : null,
         valor_cobrado: parseFloat(document.getElementById("campoValor").value) || 0,
@@ -397,6 +442,27 @@
   });
 
   // ----- RECIBO PDF -----
+  function desenharLogoRecibo(doc) {
+    // Monograma "MH" em azul-marinho com detalhe dourado — mesma paleta do painel.
+    const centroX = 26;
+    const centroY = 18;
+    const raio = 10;
+
+    doc.setFillColor(11, 37, 69); // --azul-marinho
+    doc.circle(centroX, centroY, raio, "F");
+
+    doc.setDrawColor(201, 154, 74); // --dourado
+    doc.setLineWidth(0.8);
+    doc.circle(centroX, centroY, raio, "S");
+
+    doc.setTextColor(244, 241, 232); // --creme
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(13);
+    doc.text("MH", centroX, centroY + 4, { align: "center" });
+
+    doc.setTextColor(0, 0, 0);
+  }
+
   function gerarReciboPDF(id) {
     const ag = agendamentosCache.find((a) => String(a.id) === String(id));
     if (!ag) return;
@@ -404,12 +470,14 @@
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
 
+    desenharLogoRecibo(doc);
+
     doc.setFont("helvetica", "bold");
     doc.setFontSize(16);
-    doc.text("Moreira Higienizações", 20, 22);
+    doc.text("Moreira Higienizações", 42, 20);
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
-    doc.text("Higienização profissional de estofados", 20, 29);
+    doc.text("Higienização profissional de estofados", 42, 27);
     doc.line(20, 34, 190, 34);
 
     doc.setFontSize(13);
