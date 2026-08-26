@@ -49,6 +49,10 @@
         <label>Telefone (WhatsApp)</label>
         <input type="text" id="campoTelefoneCliente" required placeholder="(85) 9 9999-9999">
       </div>
+      <div class="field">
+        <label>Endereço completo</label>
+        <input type="text" id="campoEndereco" placeholder="Rua, número, bairro, cidade">
+      </div>
       <div class="field-row">
         <div class="field">
           <label>Serviço</label>
@@ -62,6 +66,18 @@
         <div class="field">
           <label>Data do serviço</label>
           <input type="date" id="campoDataServico" required>
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Horário</label>
+          <input type="time" id="campoHorario">
+        </div>
+        <div class="field">
+          <label>Quem vai atender</label>
+          <select id="campoEquipe">
+            <option value="">— Não definido —</option>
+          </select>
         </div>
       </div>
       <div class="field-row">
@@ -116,7 +132,19 @@
   const NOMES_SERVICO = { sofa: "Sofá", colchao: "Colchão", poltrona: "Poltrona", tapete: "Tapete" };
 
   let agendamentosCache = [];
+  let equipeCache = [];
   let filtroAtual = "todos";
+
+  async function carregarEquipeSelect() {
+    try {
+      equipeCache = await listarEquipe({ apenasAtivos: true });
+      const select = document.getElementById("campoEquipe");
+      select.innerHTML = `<option value="">— Não definido —</option>` +
+        equipeCache.map((m) => `<option value="${m.id}">${m.nome}</option>`).join("");
+    } catch (err) {
+      console.error(err);
+    }
+  }
 
   async function carregarAgendamentos() {
     const container = document.getElementById("tabelaAgendamentos");
@@ -144,7 +172,7 @@
       <table>
         <thead>
           <tr>
-            <th>Cliente</th><th>Serviço</th><th>Data</th><th>Valor</th><th>Pagamento</th><th>Status</th><th></th>
+            <th>Cliente</th><th>Serviço</th><th>Data</th><th>Equipe</th><th>Valor</th><th>Pagamento</th><th>Status</th><th></th>
           </tr>
         </thead>
         <tbody>
@@ -155,7 +183,8 @@
                 <span style="color:#8b97ab; font-size:0.78rem;">${a.clientes?.telefone || ""}</span>
               </td>
               <td>${ICONES_SERVICO[a.tipo_servico] || ""} ${NOMES_SERVICO[a.tipo_servico] || a.tipo_servico}</td>
-              <td>${formatarData(a.data_servico)}</td>
+              <td>${formatarData(a.data_servico)}${a.horario ? " · " + formatarHorario(a.horario) : ""}</td>
+              <td>${a.equipe?.nome || "—"}</td>
               <td>${formatarMoeda(a.valor_cobrado)}</td>
               <td><span class="badge badge-${a.status_pagamento === 'pago' ? 'pago' : 'pendente'}">${a.status_pagamento}</span></td>
               <td>
@@ -219,27 +248,33 @@
   const modal = document.getElementById("modalAgendamento");
   const form = document.getElementById("formAgendamento");
 
-  document.getElementById("btnNovoAgendamento").addEventListener("click", () => {
+  document.getElementById("btnNovoAgendamento").addEventListener("click", async () => {
     document.getElementById("modalTitulo").textContent = "Novo agendamento";
     form.reset();
     document.getElementById("agendamentoId").value = "";
     document.getElementById("campoDataServico").value = new Date().toISOString().slice(0, 10);
+    await carregarEquipeSelect();
     modal.classList.add("open");
   });
 
   document.getElementById("btnCancelarModal").addEventListener("click", () => modal.classList.remove("open"));
   modal.addEventListener("click", (e) => { if (e.target === modal) modal.classList.remove("open"); });
 
-  function abrirModalEdicao(id) {
+  async function abrirModalEdicao(id) {
     const ag = agendamentosCache.find((a) => String(a.id) === String(id));
     if (!ag) return;
+
+    await carregarEquipeSelect();
 
     document.getElementById("modalTitulo").textContent = "Editar agendamento";
     document.getElementById("agendamentoId").value = ag.id;
     document.getElementById("campoNomeCliente").value = ag.clientes?.nome || "";
     document.getElementById("campoTelefoneCliente").value = ag.clientes?.telefone || "";
+    document.getElementById("campoEndereco").value = ag.clientes?.endereco || "";
     document.getElementById("campoTipoServico").value = ag.tipo_servico;
     document.getElementById("campoDataServico").value = (ag.data_servico || "").slice(0, 10);
+    document.getElementById("campoHorario").value = ag.horario ? ag.horario.slice(0, 5) : "";
+    document.getElementById("campoEquipe").value = ag.equipe_id || "";
     document.getElementById("campoValor").value = ag.valor_cobrado;
     document.getElementById("campoCusto").value = ag.custo_produto || 0;
     document.getElementById("campoFormaPagamento").value = ag.forma_pagamento || "pix";
@@ -256,13 +291,16 @@
       const cliente = await buscarOuCriarCliente({
         nome: document.getElementById("campoNomeCliente").value.trim(),
         telefone: document.getElementById("campoTelefoneCliente").value.trim(),
-        bairro: null
+        bairro: null,
+        endereco: document.getElementById("campoEndereco").value.trim() || null
       });
 
       const payload = {
         cliente_id: cliente.id,
         tipo_servico: document.getElementById("campoTipoServico").value,
         data_servico: document.getElementById("campoDataServico").value,
+        horario: document.getElementById("campoHorario").value || null,
+        equipe_id: document.getElementById("campoEquipe").value || null,
         valor_cobrado: parseFloat(document.getElementById("campoValor").value) || 0,
         custo_produto: parseFloat(document.getElementById("campoCusto").value) || 0,
         forma_pagamento: document.getElementById("campoFormaPagamento").value,
