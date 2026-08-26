@@ -1,16 +1,16 @@
 // ============================================
 // SIDEBAR — injetada em todas as páginas do admin
 // ============================================
-
 const MENU_ITEMS = [
   { id: "dashboard", icon: "📊", label: "Dashboard", href: "dashboard.html" },
   { id: "agendamentos", icon: "🗓️", label: "Agendamentos", href: "agendamentos.html" },
+  { id: "rota", icon: "🗺️", label: "Rota do dia", href: "rota.html" },
   { id: "clientes", icon: "👥", label: "Clientes", href: "clientes.html" },
+  { id: "equipe", icon: "🧑‍🤝‍🧑", label: "Equipe", href: "equipe.html" },
   { id: "financeiro", icon: "💰", label: "Financeiro", href: "financeiro.html" },
   { id: "galeria", icon: "🖼️", label: "Galeria do Site", href: "galeria.html" },
   { id: "bot", icon: "💬", label: "WhatsApp Bot", href: "bot.html" }
 ];
-
 function montarSidebar(paginaAtiva) {
   const sidebarHTML = `
     <button class="menu-toggle" id="menuToggle" aria-label="Abrir menu">☰</button>
@@ -41,13 +41,11 @@ function montarSidebar(paginaAtiva) {
     </aside>
   `;
   document.body.insertAdjacentHTML("afterbegin", sidebarHTML);
-
   const toggle = document.getElementById("menuToggle");
   const sidebar = document.getElementById("sidebar");
   if (toggle && sidebar) {
     toggle.addEventListener("click", () => sidebar.classList.toggle("open"));
   }
-
   const btnLogout = document.getElementById("btnLogoutSidebar");
   if (btnLogout) {
     btnLogout.addEventListener("click", (e) => {
@@ -56,10 +54,8 @@ function montarSidebar(paginaAtiva) {
       window.location.href = "login.html";
     });
   }
-
   atualizarBadgeAgendamentosPendentes();
 }
-
 async function atualizarBadgeAgendamentosPendentes() {
   const badge = document.getElementById("badgeAgendamentosPendentes");
   if (!badge) return;
@@ -73,7 +69,6 @@ async function atualizarBadgeAgendamentosPendentes() {
     // silencioso — banco pode ainda não estar configurado
   }
 }
-
 // Protege as páginas do admin: redireciona para login se não houver sessão
 function protegerPagina() {
   const sessao = sessionStorage.getItem("moreira_admin_usuario");
