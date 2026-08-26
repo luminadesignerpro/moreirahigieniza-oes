@@ -45,6 +45,42 @@ function decidirResposta(textoRecebido, fluxo) {
   return "Não entendi 🤔\n\nDigite *menu* para ver as opções novamente.";
 }
 
+// Tenta identificar se o cliente respondeu confirmando ou pedindo pra remarcar
+// o próximo agendamento dele. Retorna 'confirmado', 'remarcar' ou null.
+function detectarConfirmacao(textoRecebido) {
+  const texto = (textoRecebido || "").trim().toLowerCase();
+  if (["confirmar", "confirmo", "confirmado", "sim", "ok", "beleza"].includes(texto)) {
+    return "confirmado";
+  }
+  if (["remarcar", "reagendar", "não posso", "nao posso", "mudar"].includes(texto)) {
+    return "remarcar";
+  }
+  return null;
+}
+
+// Busca o próximo agendamento (hoje ou futuro, ainda não cancelado/concluído)
+// do cliente dono deste número de telefone.
+async function buscarProximoAgendamento(numero) {
+  const { data: cliente } = await supabase
+    .from("clientes")
+    .select("id")
+    .ilike("telefone", `%${numero.slice(-8)}%`)
+    .maybeSingle();
+  if (!cliente) return null;
+
+  const hoje = new Date().toISOString().slice(0, 10);
+  const { data: agendamento } = await supabase
+    .from("agendamentos")
+    .select("id, status")
+    .eq("cliente_id", cliente.id)
+    .gte("data_servico", hoje)
+    .in("status", ["agendado", "andamento"])
+    .order("data_servico", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  return agendamento;
+}
+
 async function enviarMensagemWhatsApp({ url, key, instancia, numero, texto }) {
   const resp = await fetch(`${url}/message/sendText/${instancia}`, {
     method: "POST",
@@ -113,8 +149,27 @@ module.exports = async (req, res) => {
       return;
     }
 
-    const resposta = decidirResposta(textoRecebido, config);
     const numero = remoteJid.split("@")[0];
+
+    // Confirmação/remarcação de agendamento tem prioridade sobre o menu comum
+    const tipoConfirmacao = detectarConfirmacao(textoRecebido);
+    if (tipoConfirmacao) {
+      const agendamento = await buscarProximoAgendamento(numero);
+      if (agendamento) {
+        await supabase.from("agendamentos").update({ confirmado: tipoConfirmacao }).eq("id", agendamento.id);
+        const resposta = tipoConfirmacao === "confirmado"
+          ? "Show! Seu horário está confirmado ✅ Até lá!"
+          : "Sem problema! Vamos remarcar — me diga qual dia e horário ficam melhores pra você.";
+        await enviarMensagemWhatsApp({
+          url: config.evolution_url, key: config.evolution_key, instancia: config.evolution_instancia,
+          numero, texto: resposta
+        });
+        res.status(200).json({ ok: true });
+        return;
+      }
+    }
+
+    const resposta = decidirResposta(textoRecebido, config);
 
     await enviarMensagemWhatsApp({
       url: config.evolution_url,
