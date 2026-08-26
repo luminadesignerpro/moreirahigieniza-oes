@@ -2,12 +2,13 @@
 // ADMIN — CAMADA DE DADOS (Supabase)
 // Funções compartilhadas entre todas as páginas
 // do painel admin. Tabelas usadas:
-//   - clientes
-//   - agendamentos   (1 serviço = 1 agendamento)
+//   - clientes        (agora com campo endereco)
+//   - agendamentos    (agora com horario e equipe_id)
 //   - galeria
-//   - usuarios_admin (login)
-//   - bot_config     (fluxo do WhatsApp Bot + config Evolution API)
+//   - usuarios_admin  (login)
+//   - bot_config      (fluxo do WhatsApp Bot + config Evolution API)
 //   - despesas_gerais (gastos do negócio, fora do custo por serviço)
+//   - equipe          (ajudantes/funcionários)
 // ============================================
 
 const STATUS_AGENDAMENTO = {
@@ -44,7 +45,7 @@ async function listarClientes() {
   return data || [];
 }
 
-async function buscarOuCriarCliente({ nome, telefone, bairro }) {
+async function buscarOuCriarCliente({ nome, telefone, bairro, endereco }) {
   const supabase = await getSupabaseClient();
 
   const { data: existente, error: errBusca } = await supabase
@@ -53,11 +54,24 @@ async function buscarOuCriarCliente({ nome, telefone, bairro }) {
     .eq("telefone", telefone)
     .maybeSingle();
   if (errBusca) throw errBusca;
-  if (existente) return existente;
+
+  if (existente) {
+    if (endereco && endereco !== existente.endereco) {
+      const { data: atualizado, error: errAtualizar } = await supabase
+        .from("clientes")
+        .update({ endereco })
+        .eq("id", existente.id)
+        .select()
+        .single();
+      if (errAtualizar) throw errAtualizar;
+      return atualizado;
+    }
+    return existente;
+  }
 
   const { data: novo, error: errCriar } = await supabase
     .from("clientes")
-    .insert([{ nome, telefone, bairro }])
+    .insert([{ nome, telefone, bairro, endereco }])
     .select()
     .single();
   if (errCriar) throw errCriar;
@@ -71,7 +85,7 @@ async function listarAgendamentos({ status = null, limite = 100 } = {}) {
   const supabase = await getSupabaseClient();
   let query = supabase
     .from("agendamentos")
-    .select("*, clientes(nome, telefone, bairro)")
+    .select("*, clientes(nome, telefone, bairro, endereco), equipe(nome)")
     .order("data_servico", { ascending: false })
     .limit(limite);
 
@@ -108,6 +122,67 @@ async function atualizarAgendamento(id, campos) {
 async function excluirAgendamento(id) {
   const supabase = await getSupabaseClient();
   const { error } = await supabase.from("agendamentos").delete().eq("id", id);
+  if (error) throw error;
+}
+
+// --------------------------------------------
+// ROTA DO DIA — agendamentos de uma data, ordenados por horário
+// --------------------------------------------
+async function listarAgendamentosDoDia(dataISO) {
+  const supabase = await getSupabaseClient();
+  const { data, error } = await supabase
+    .from("agendamentos")
+    .select("*, clientes(nome, telefone, bairro, endereco), equipe(nome)")
+    .eq("data_servico", dataISO)
+    .neq("status", "cancelado")
+    .order("horario", { ascending: true, nullsFirst: false });
+  if (error) throw error;
+  return data || [];
+}
+
+function gerarLinkGoogleMaps(endereco) {
+  if (!endereco) return null;
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(endereco)}`;
+}
+
+// --------------------------------------------
+// EQUIPE (ajudantes que atendem os serviços)
+// --------------------------------------------
+async function listarEquipe({ apenasAtivos = false } = {}) {
+  const supabase = await getSupabaseClient();
+  let query = supabase.from("equipe").select("*").order("nome", { ascending: true });
+  if (apenasAtivos) query = query.eq("ativo", true);
+  const { data, error } = await query;
+  if (error) throw error;
+  return data || [];
+}
+
+async function criarMembroEquipe({ nome, telefone }) {
+  const supabase = await getSupabaseClient();
+  const { data, error } = await supabase
+    .from("equipe")
+    .insert([{ nome, telefone, ativo: true }])
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function atualizarMembroEquipe(id, campos) {
+  const supabase = await getSupabaseClient();
+  const { data, error } = await supabase
+    .from("equipe")
+    .update(campos)
+    .eq("id", id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function excluirMembroEquipe(id) {
+  const supabase = await getSupabaseClient();
+  const { error } = await supabase.from("equipe").delete().eq("id", id);
   if (error) throw error;
 }
 
@@ -360,6 +435,11 @@ function formatarData(dataISO) {
   if (!dataISO) return "—";
   const d = new Date(dataISO);
   return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
+function formatarHorario(horario) {
+  if (!horario) return "—";
+  return horario.slice(0, 5);
 }
 
 function mostrarToast(mensagem, tipo = "default") {
