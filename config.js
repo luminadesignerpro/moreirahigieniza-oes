@@ -3,20 +3,16 @@
 // Edite este arquivo para trocar número, preços
 // e textos sem precisar tocar no resto do código.
 // ============================================
-
 const CONFIG = {
   // Número de WhatsApp no formato internacional (sem espaços, sem +)
   whatsappNumero: "5585989002147",
-
   // Chave Pix usada para gerar QR Code de cobrança (CPF, CNPJ, telefone, e-mail ou aleatória)
-  // TROQUE pelo valor real antes de usar em produção.
-  pixChave: "SUA-CHAVE-PIX-AQUI",
+  // Chave do tipo telefone: o Banco Central exige o formato +55DDDNUMERO
+  pixChave: "+5585989002147",
   pixNomeRecebedor: "Moreira Higienizacoes",
   pixCidade: "Fortaleza",
-
   // Mensagem padrão enviada ao clicar nos botões de WhatsApp do site
   mensagemPadrao: "Olá! Vim pelo site e quero pedir um orçamento de higienização 🧼",
-
   // Tabela de preços usada no simulador (valores em reais)
   precos: {
     sofa: {
@@ -39,7 +35,6 @@ const CONFIG = {
     }
   }
 };
-
 // Liga os botões de WhatsApp do site ao número configurado acima
 function montarLinkWhatsApp(mensagem) {
   const texto = encodeURIComponent(mensagem || CONFIG.mensagemPadrao);
