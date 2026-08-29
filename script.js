@@ -1,11 +1,12 @@
 // ============================================
 // SCRIPT PRINCIPAL — SITE PÚBLICO
 // ============================================
-
 document.addEventListener("DOMContentLoaded", () => {
   ligarBotoesWhatsApp();
   ativarRevealScroll();
   carregarGaleria();
+  ativarScrollSpyMenu();
+  ativarParallaxHero();
 });
 
 // --------------------------------------------
@@ -26,10 +27,35 @@ function ligarBotoesWhatsApp() {
 }
 
 // --------------------------------------------
-// Animação simples de revelar elementos ao rolar a página
+// Animação de revelar elementos ao rolar a página.
+// Elementos dentro de um mesmo grid (cards de serviço,
+// depoimentos, galeria, processo) entram alternando de
+// lados diferentes e com um pequeno atraso em cascata,
+// em vez de todos aparecerem juntos de baixo pra cima.
 // --------------------------------------------
 function ativarRevealScroll() {
   const elementos = document.querySelectorAll(".reveal");
+
+  // Agrupa os elementos pelo elemento pai (ex: services-grid,
+  // testimonials-grid, gallery-grid, process-grid) pra saber
+  // a posição de cada um dentro do grupo.
+  const grupos = new Map();
+  elementos.forEach((el) => {
+    const pai = el.parentElement;
+    if (!grupos.has(pai)) grupos.set(pai, []);
+    grupos.get(pai).push(el);
+  });
+
+  grupos.forEach((itens) => {
+    const ehGrade = itens.length > 1;
+    itens.forEach((el, index) => {
+      if (ehGrade) {
+        el.classList.add(index % 2 === 0 ? "reveal-left" : "reveal-right");
+        el.style.transitionDelay = Math.min(index * 90, 360) + "ms";
+      }
+    });
+  });
+
   const observer = new IntersectionObserver(
     (entradas) => {
       entradas.forEach((entrada) => {
@@ -45,13 +71,62 @@ function ativarRevealScroll() {
 }
 
 // --------------------------------------------
+// Destaca no menu (desktop) a seção que está visível
+// enquanto o visitante rola a página.
+// --------------------------------------------
+function ativarScrollSpyMenu() {
+  const links = document.querySelectorAll("nav.nav-desktop a[href^='#']");
+  if (!links.length) return;
+
+  const secoes = Array.from(links)
+    .map((link) => document.querySelector(link.getAttribute("href")))
+    .filter(Boolean);
+
+  if (!secoes.length) return;
+
+  const observer = new IntersectionObserver(
+    (entradas) => {
+      entradas.forEach((entrada) => {
+        const link = document.querySelector(`nav.nav-desktop a[href="#${entrada.target.id}"]`);
+        if (!link) return;
+        if (entrada.isIntersecting) {
+          links.forEach((l) => l.classList.remove("active"));
+          link.classList.add("active");
+        }
+      });
+    },
+    { threshold: 0.3, rootMargin: "-84px 0px -50% 0px" }
+  );
+
+  secoes.forEach((secao) => observer.observe(secao));
+}
+
+// --------------------------------------------
+// Leve efeito parallax no selo do hero: se move um pouco
+// mais devagar que o resto da página ao rolar.
+// --------------------------------------------
+function ativarParallaxHero() {
+  const visual = document.querySelector(".hero-visual");
+  if (!visual) return;
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+  window.addEventListener(
+    "scroll",
+    () => {
+      const deslocamento = Math.min(window.scrollY * 0.12, 60);
+      visual.style.transform = `translateY(${deslocamento}px)`;
+    },
+    { passive: true }
+  );
+}
+
+// --------------------------------------------
 // Carrega fotos da galeria a partir do Supabase
 // (cai de volta nos placeholders se não houver fotos ainda)
 // --------------------------------------------
 async function carregarGaleria() {
   const grid = document.getElementById("galleryGrid");
   if (!grid || typeof getSupabaseClient !== "function") return;
-
   try {
     const supabase = await getSupabaseClient();
     const { data, error } = await supabase
@@ -59,15 +134,12 @@ async function carregarGaleria() {
       .select("*")
       .order("criado_em", { ascending: false })
       .limit(6);
-
     if (error) throw error;
     if (!data || data.length === 0) return; // mantém as imagens padrão do HTML
-
     grid.innerHTML = "";
     data.forEach((item, index) => {
       const div = document.createElement("div");
       div.className = "gallery-item reveal visible" + (index === 0 || index === 3 ? " tall" : "");
-
       const eVideo = item.tipo === 'video';
       if (eVideo) {
         div.innerHTML = `
@@ -82,7 +154,6 @@ async function carregarGaleria() {
       }
       grid.appendChild(div);
     });
-
   } catch (err) {
     console.warn("Galeria: usando imagens padrão (Supabase ainda não configurado ou vazio).", err);
   }
