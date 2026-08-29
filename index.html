@@ -149,12 +149,15 @@
   nav.nav-desktop a{
     font-size:.86rem; font-weight:500; color:var(--navy);
     position:relative; padding-bottom:2px; white-space:nowrap;
+    transition:color .25s;
   }
   nav.nav-desktop a::after{
     content:''; position:absolute; left:0; bottom:-3px; width:0; height:1.5px;
     background:var(--gold); transition:width .25s ease;
   }
   nav.nav-desktop a:hover::after{ width:100%; }
+  nav.nav-desktop a.active{ color:var(--gold); }
+  nav.nav-desktop a.active::after{ width:100%; }
 
   .header-actions{ display:flex; align-items:center; gap:8px; flex-shrink:0; }
 
@@ -229,7 +232,7 @@
     align-items:center;
     position:relative; z-index:2;
   }
-  .hero-visual{ order:-1; display:flex; justify-content:center; }
+  .hero-visual{ order:-1; display:flex; justify-content:center; will-change:transform; }
   .hero-seal-outer{ width:min(260px, 60vw); aspect-ratio:1; position:relative; }
   .hero-seal-ring{
     width:100%; height:100%; border-radius:50%; overflow:hidden;
@@ -481,9 +484,18 @@
 
   /* ============================================================
      REVEAL ON SCROLL
+     — .reveal-left/.reveal-right (aplicadas via JS aos itens de
+       grid) fazem os cards entrarem alternando de lado, com um
+       leve atraso em cascata definido também pelo JS.
   ============================================================ */
-  .reveal{ opacity:0; transform:translateY(16px); transition:opacity .6s ease, transform .6s ease; }
-  .reveal.visible{ opacity:1; transform:translateY(0); }
+  .reveal{
+    opacity:0;
+    transform:translateY(24px);
+    transition:opacity .7s cubic-bezier(.22,.61,.36,1), transform .7s cubic-bezier(.22,.61,.36,1);
+  }
+  .reveal.reveal-left{ transform:translate(-36px, 14px); }
+  .reveal.reveal-right{ transform:translate(36px, 14px); }
+  .reveal.visible{ opacity:1; transform:translate(0,0); }
   @media (prefers-reduced-motion: reduce){
     .reveal{ opacity:1; transform:none; transition:none; }
     .hero-seal-ring, .whatsapp-float{ animation:none; }
@@ -865,8 +877,9 @@
   <script>
     // ================================================================
     // Lógica exclusiva desta versão do layout (simulador, menu mobile,
-    // sombra do header). WhatsApp, reveal e galeria já ficam por conta
-    // do script.js do projeto — não duplicamos aqui.
+    // sombra do header). WhatsApp, reveal, scroll-spy, parallax e
+    // galeria já ficam por conta do script.js do projeto — não
+    // duplicamos aqui.
     // ================================================================
 
     // Ano no footer
